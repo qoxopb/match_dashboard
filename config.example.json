@@ -1,0 +1,21 @@
+{
+  "mode": "both",
+  "jobs": {
+    "pairing": { "enabled": true, "schedule": "0 9 * * 1-5" },
+    "statusCheck": { "enabled": true, "schedule": "*/30 * * * *" }
+  },
+  "gas": {
+    "url": "YOUR_GAS_URL"
+  },
+  "slack": {
+    "userToken": "xoxp-...",
+    "botToken": "xoxb-...",
+    "channelId": "YOUR_CHANNEL_ID"
+  },
+  "aimKeywords": [],
+  "sheets": {
+    "new": "YOUR_SHEET_ID",
+    "rematch": "YOUR_SHEET_ID",
+    "newQueryGid": "YOUR_GID"
+  }
+}

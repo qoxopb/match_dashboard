@@ -1,0 +1,1310 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>콴다과외 매칭 자동화</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, 'Segoe UI', sans-serif;
+      background: #f0f2f5; color: #333;
+      min-height: 100vh;
+    }
+    h1 { font-size: 22px; font-weight: 700; margin-bottom: 20px; }
+    .subtitle { font-size: 13px; color: #888; margin-bottom: 20px; }
+
+    /* 레이아웃 */
+    .app { display: flex; min-height: 100vh; }
+    .sidebar {
+      width: clamp(200px, 18vw, 280px); flex-shrink: 0;
+      background: #1a1a2e; color: #d4d4d4;
+      padding: 24px 0; position: sticky; top: 0; height: 100vh;
+    }
+    .sidebar-brand {
+      padding: 0 20px 20px; font-size: 14px; font-weight: 600;
+      color: #fff; border-bottom: 1px solid #2a2a3e; margin-bottom: 12px;
+    }
+    .sidebar-menu { list-style: none; }
+    .sidebar-menu li {
+      padding: 12px 20px; font-size: 14px; cursor: pointer;
+      border-left: 3px solid transparent; transition: all .15s;
+      user-select: none;
+    }
+    .sidebar-menu li:hover { background: #22223a; }
+    .sidebar-menu li.active {
+      background: #22223a; border-left-color: #1976d2; color: #fff; font-weight: 500;
+    }
+    .main {
+      flex: 1; padding: 24px; max-width: 900px;
+    }
+    .view { display: none; }
+    .view.active { display: block; }
+    .empty-view {
+      display: flex; align-items: center; justify-content: center;
+      min-height: 60vh; color: #aaa; font-size: 14px;
+    }
+
+    /* 상태바 */
+    .status-bar {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 16px; border-radius: 8px; margin-bottom: 20px; font-size: 13px;
+    }
+    .status-idle { background: #e8f5e9; color: #2e7d32; }
+    .status-running { background: #fff3e0; color: #e65100; }
+    .spinner { width: 14px; height: 14px; border: 2px solid #e65100; border-top-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* 카드 */
+    .card {
+      background: #fff; border-radius: 12px; padding: 20px;
+      margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    }
+    .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+    .card-title { font-size: 16px; font-weight: 600; }
+
+    /* 스케줄 토글 */
+    .sched-toggle-header {
+      display: flex; align-items: center; gap: 6px;
+      cursor: pointer; user-select: none; margin-top: 12px;
+      padding: 8px 0; border-top: 1px solid #f0f0f0;
+    }
+    .sched-toggle-header:hover { opacity: 0.7; }
+    .sched-toggle-header .arrow {
+      font-size: 10px; color: #999; transition: transform .2s; display: inline-block;
+    }
+    .sched-toggle-header .arrow.open { transform: rotate(90deg); }
+    .sched-toggle-header span.label { font-size: 13px; color: #666; font-weight: 500; }
+    .sched-body { overflow: hidden; transition: max-height .3s ease, opacity .2s ease; }
+    .sched-body.collapsed { max-height: 0; opacity: 0; }
+    .sched-body.expanded { max-height: 600px; opacity: 1; }
+    .badge { font-size: 11px; padding: 3px 8px; border-radius: 10px; font-weight: 500; }
+    .badge-active { background: #e8f5e9; color: #2e7d32; }
+    .badge-off { background: #f5f5f5; color: #999; }
+
+    /* 버튼 */
+    button {
+      padding: 8px 16px; border: none; border-radius: 6px;
+      font-size: 13px; font-weight: 500; cursor: pointer; transition: all .15s;
+    }
+    button:hover { filter: brightness(0.93); }
+    button:disabled { opacity: .4; cursor: not-allowed; }
+    .btn-run { background: #1976d2; color: #fff; }
+    .btn-start { background: #43a047; color: #fff; }
+    .btn-stop { background: #e53935; color: #fff; }
+    .btn-small { padding: 5px 10px; font-size: 12px; }
+    .btn-ghost { background: transparent; color: #e53935; padding: 4px 8px; font-size: 12px; }
+    .btn-monthly { background: #7b1fa2; color: #fff; }
+    .btn-abort { background: #e53935; color: #fff; margin-left: auto; padding: 5px 14px; font-size: 12px; }
+
+    /* 즉시 실행 영역 */
+    .run-section { margin-bottom: 16px; }
+    .run-section label { font-size: 13px; color: #666; font-weight: 500; display: block; margin-bottom: 6px; }
+
+    /* 탭 */
+    .tabs { display: flex; gap: 0; margin-bottom: 14px; border-bottom: 2px solid #e0e0e0; }
+    .tab {
+      padding: 8px 16px; font-size: 13px; font-weight: 500; color: #999;
+      cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all .15s;
+    }
+    .tab.active { color: #1976d2; border-bottom-color: #1976d2; }
+
+    /* 주기 설정 */
+    .interval-options { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .interval-chip {
+      padding: 6px 14px; border-radius: 16px; font-size: 13px;
+      border: 1px solid #ddd; cursor: pointer; transition: all .15s; background: #fff;
+    }
+    .interval-chip.selected { background: #1976d2; color: #fff; border-color: #1976d2; }
+
+    /* 알람 설정 */
+    .alarm-add { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+    .time-input {
+      font-size: 28px; font-weight: 300; padding: 8px 12px;
+      border: 1px solid #ddd; border-radius: 8px; width: 140px; text-align: center;
+      font-family: -apple-system, 'Segoe UI', sans-serif;
+    }
+    .day-chips { display: flex; gap: 4px; }
+    .day-chip {
+      width: 32px; height: 32px; border-radius: 50%; font-size: 12px;
+      display: flex; align-items: center; justify-content: center;
+      border: 1px solid #ddd; cursor: pointer; transition: all .15s; background: #fff;
+    }
+    .day-chip.selected { background: #1976d2; color: #fff; border-color: #1976d2; }
+
+    /* 스케줄 목록 */
+    .schedule-list { margin-top: 12px; }
+    .schedule-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px; border-radius: 8px; background: #fafafa;
+      margin-bottom: 6px; font-size: 13px;
+    }
+    .schedule-item .left { display: flex; align-items: center; gap: 10px; }
+    .schedule-item .time-label { font-size: 15px; font-weight: 500; }
+    .schedule-item .type-label { font-size: 11px; color: #999; }
+
+    /* 토글 스위치 */
+    .toggle { position: relative; width: 40px; height: 22px; cursor: pointer; }
+    .toggle input { display: none; }
+    .toggle-slider {
+      position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+      background: #ccc; border-radius: 22px; transition: .2s;
+    }
+    .toggle-slider:before {
+      content: ''; position: absolute; width: 18px; height: 18px;
+      left: 2px; bottom: 2px; background: #fff; border-radius: 50%; transition: .2s;
+    }
+    .toggle input:checked + .toggle-slider { background: #43a047; }
+    .toggle input:checked + .toggle-slider:before { transform: translateX(18px); }
+
+    /* 워크플로우 (스크래치 UI) */
+    .wf-toolbar {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 16px;
+      background: #fff; padding: 12px 16px; border-radius: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    }
+    .wf-preset-select {
+      padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px;
+    }
+    .wf-rename {
+      padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px;
+      width: 160px;
+    }
+    .wf-btn {
+      padding: 6px 14px; font-size: 13px; border-radius: 6px; border: none; cursor: pointer;
+      font-weight: 500;
+    }
+    .wf-btn-save { background: #1976d2; color: #fff; }
+    .wf-btn-run { background: #43a047; color: #fff; }
+    .wf-btn-clear { background: #eee; color: #666; }
+    .wf-btn-del { background: #e53935; color: #fff; }
+
+    .wf-area {
+      display: grid; grid-template-columns: 240px 1fr 220px; gap: 16px;
+    }
+    .wf-presets {
+      background: #fff; border-radius: 10px; padding: 16px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+      max-height: calc(100vh - 200px); overflow-y: auto;
+    }
+    .wf-preset-item {
+      padding: 10px 12px; border-radius: 6px; background: #fafafa;
+      margin-bottom: 6px; cursor: pointer; transition: all .15s;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 6px; border: 2px solid transparent;
+    }
+    .wf-preset-item:hover { background: #f0f0f0; }
+    .wf-preset-item.active { background: #e3f2fd; border-color: #1976d2; }
+    .wf-preset-name { font-size: 13px; font-weight: 500; flex: 1; word-break: break-all; }
+    .wf-preset-meta { font-size: 11px; color: #999; }
+    .wf-preset-del {
+      background: transparent; color: #e53935; border: none;
+      cursor: pointer; padding: 2px 6px; font-size: 13px;
+    }
+    .wf-preset-del:hover { background: rgba(229,57,53,.1); border-radius: 4px; }
+    .wf-add-preset {
+      width: 100%; padding: 8px; background: #1976d2; color: #fff;
+      border: none; border-radius: 6px; font-size: 13px; cursor: pointer;
+      margin-top: 8px;
+    }
+
+    /* 조건 반복 블럭 */
+    .wf-cond-block {
+      background: #455a64; color: #fff; border-radius: 6px;
+      box-shadow: 0 2px 0 rgba(0,0,0,.15);
+    }
+    .wf-cond-header {
+      padding: 10px 14px; display: flex; flex-wrap: wrap; align-items: center;
+      gap: 6px; font-size: 12px; font-weight: 500;
+    }
+    .wf-cond-header select, .wf-cond-header input {
+      background: rgba(255,255,255,.2); border: 1px solid rgba(255,255,255,.3);
+      color: #fff; padding: 3px 6px; border-radius: 4px; font-size: 12px;
+    }
+    .wf-cond-header select option { color: #333; }
+    .wf-cond-header .wf-ws-actions { margin-left: auto; }
+    .wf-palette, .wf-workspace {
+      background: #fff; border-radius: 10px; padding: 16px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+      max-height: calc(100vh - 200px); overflow-y: auto;
+    }
+    .wf-section-title {
+      font-size: 12px; font-weight: 700; color: #999; text-transform: uppercase;
+      margin: 12px 0 6px; letter-spacing: 0.5px;
+    }
+    .wf-section-title:first-child { margin-top: 0; }
+
+    /* 블럭 — 스크래치 스타일 */
+    .wf-block {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 14px; border-radius: 6px; font-size: 13px; font-weight: 500;
+      color: #fff; cursor: grab; user-select: none;
+      box-shadow: 0 2px 0 rgba(0,0,0,.15);
+      margin-bottom: 6px; min-height: 32px;
+    }
+    .wf-block:hover { filter: brightness(1.05); }
+    .wf-block:active { cursor: grabbing; }
+    .wf-block.cat-prep { background: #4fc3f7; }
+    .wf-block.cat-pairing { background: #66bb6a; }
+    .wf-block.cat-aim { background: #ab47bc; }
+    .wf-block.cat-status { background: #ff9800; }
+    .wf-block.cat-monthly { background: #ec407a; }
+    .wf-block.cat-control { background: #607d8b; }
+
+    /* 워크스페이스의 블럭 — 세로 스택 */
+    .wf-workspace-list {
+      display: flex; flex-direction: column; gap: 8px; min-height: 200px;
+      padding: 12px; background: #fafafa; border: 2px dashed #ddd; border-radius: 8px;
+    }
+    .wf-workspace-list.drag-over { background: #e3f2fd; border-color: #1976d2; }
+    .wf-ws-block {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 8px; padding: 10px 14px; border-radius: 6px; font-size: 13px; font-weight: 500;
+      color: #fff; box-shadow: 0 2px 0 rgba(0,0,0,.15);
+    }
+    .wf-ws-block.cat-prep { background: #4fc3f7; }
+    .wf-ws-block.cat-pairing { background: #66bb6a; }
+    .wf-ws-block.cat-aim { background: #ab47bc; }
+    .wf-ws-block.cat-status { background: #ff9800; }
+    .wf-ws-block.cat-monthly { background: #ec407a; }
+    .wf-ws-block.cat-control { background: #607d8b; }
+    .wf-ws-block .wf-ws-actions { display: flex; gap: 4px; }
+    .wf-ws-block .wf-ws-actions button {
+      background: rgba(0,0,0,.2); color: #fff; border: none;
+      width: 24px; height: 24px; border-radius: 4px; font-size: 13px; cursor: pointer;
+    }
+    .wf-ws-block .wf-ws-actions button:hover { background: rgba(0,0,0,.35); }
+
+    .wf-empty-msg { color: #aaa; text-align: center; padding: 30px; font-size: 13px; }
+
+    /* 반복 블럭 (자식 블럭 포함) */
+    .wf-loop-block {
+      background: #607d8b; color: #fff; border-radius: 6px;
+      box-shadow: 0 2px 0 rgba(0,0,0,.15);
+    }
+    .wf-loop-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px; font-size: 13px; font-weight: 500;
+    }
+    .wf-loop-count {
+      width: 50px; padding: 3px 6px; border-radius: 4px; border: none;
+      font-size: 13px; text-align: center; margin: 0 6px;
+    }
+    .wf-loop-children {
+      padding: 8px 12px 12px 24px; min-height: 40px;
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .wf-loop-children.drag-over { background: rgba(255,255,255,.15); }
+
+    /* 로그 */
+    #log-box {
+      background: #1a1a2e; color: #d4d4d4;
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 11.5px; line-height: 1.6;
+      padding: 16px; border-radius: 10px; height: 300px;
+      overflow-y: auto; white-space: pre-wrap; word-break: break-all;
+    }
+    #log-box .error { color: #ff6b6b; }
+    #log-box .success { color: #69db7c; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="sidebar-brand">콴다과외 매칭</div>
+      <ul class="sidebar-menu">
+        <li class="active" data-view="features" onclick="switchView('features')">기능</li>
+        <li data-view="workflow" onclick="switchView('workflow')">워크플로우</li>
+        <li data-view="status" onclick="switchView('status')">당일 현황</li>
+        <li data-view="dashboard" onclick="switchView('dashboard')">대시보드</li>
+      </ul>
+    </aside>
+
+    <main class="main">
+      <!-- 기능 -->
+      <section class="view active" id="view-features">
+        <h1>기능</h1>
+
+        <div class="status-bar status-idle" id="status-bar">
+          <span id="status-text">대기 중</span>
+        </div>
+
+  <!-- 시트 정리 -->
+  <div class="card" id="card-prep">
+    <div class="card-header">
+      <span class="card-title">시트 정리</span>
+      <span class="badge badge-off" id="badge-prep">스케줄 없음</span>
+    </div>
+    <div class="run-section">
+      <label>즉시 실행</label>
+      <div style="display:flex;gap:6px;">
+        <button class="btn-run" onclick="runNow('prep:new')">신규매칭</button>
+        <button class="btn-run" onclick="runNow('prep:rematch')">재매칭</button>
+        <button class="btn-run" onclick="runNow('prep')">전체</button>
+      </div>
+    </div>
+    <div class="sched-toggle-header" onclick="toggleSched('prep')">
+      <span class="arrow" id="sched-arrow-prep">&#9654;</span>
+      <span class="label">스케줄 설정</span>
+    </div>
+    <div class="sched-body collapsed" id="sched-body-prep">
+      <div class="schedule-section" data-job="prep"></div>
+    </div>
+  </div>
+
+  <!-- 페어링 생성 -->
+  <div class="card" id="card-pairing">
+    <div class="card-header">
+      <span class="card-title">페어링 생성</span>
+      <span class="badge badge-off" id="badge-pairing">스케줄 없음</span>
+    </div>
+    <div class="run-section">
+      <label>즉시 실행</label>
+      <button class="btn-run" onclick="runNow('pairing')">페어링 생성</button>
+    </div>
+    <div class="sched-toggle-header" onclick="toggleSched('pairing')">
+      <span class="arrow" id="sched-arrow-pairing">&#9654;</span>
+      <span class="label">스케줄 설정</span>
+    </div>
+    <div class="sched-body collapsed" id="sched-body-pairing">
+      <div class="schedule-section" data-job="pairing"></div>
+    </div>
+  </div>
+
+  <!-- 유저메모 편집 -->
+  <div class="card" id="card-userMemo">
+    <div class="card-header">
+      <span class="card-title">유저메모 편집</span>
+    </div>
+    <div class="run-section">
+      <label>필터</label>
+      <div id="memo-filter-toggle" style="display:inline-flex;border:1px solid #d9d9d9;border-radius:4px;overflow:hidden;font-size:13px;margin-bottom:8px;">
+        <button onclick="setMemoFilter('initial')" id="memo-filter-initial" style="padding:4px 14px;border:none;cursor:pointer;background:#1976d2;color:#fff;">초기편집</button>
+        <button onclick="setMemoFilter('all')" id="memo-filter-all" style="padding:4px 14px;border:none;cursor:pointer;background:#fff;color:#333;">전체</button>
+      </div>
+    </div>
+    <div class="run-section">
+      <label>새 창에서 즉시 실행</label>
+      <div style="display:flex;gap:6px;">
+        <button class="btn-run" onclick="openMemo('new')">신규매칭</button>
+        <button class="btn-run" onclick="openMemo('rematch')">재매칭</button>
+        <button class="btn-run" onclick="openMemoAll()">전체</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 매칭 제안 (aim 후 수동) -->
+  <div class="card" id="card-aim">
+    <div class="card-header">
+      <span class="card-title">매칭 제안 (aim 후 수동)</span>
+      <span class="badge badge-off" id="badge-aim">스케줄 없음</span>
+      <button class="btn-run" style="margin-left:auto;font-size:12px;padding:3px 10px;" onclick="openAimKeywords()">설정</button>
+    </div>
+    <div class="run-section">
+      <label>즉시 실행</label>
+      <div style="display:flex;gap:6px;">
+        <button class="btn-run" onclick="runNow('aim:new')">신규매칭</button>
+        <button class="btn-run" onclick="runNow('aim:rematch')">재매칭</button>
+        <button class="btn-run" onclick="runNow('aim')">전체</button>
+      </div>
+    </div>
+    <div class="sched-toggle-header" onclick="toggleSched('aim')">
+      <span class="arrow" id="sched-arrow-aim">&#9654;</span>
+      <span class="label">스케줄 설정</span>
+    </div>
+    <div class="sched-body collapsed" id="sched-body-aim">
+      <div class="schedule-section" data-job="aim"></div>
+    </div>
+  </div>
+
+  <!-- 매칭결과 확인 -->
+  <div class="card" id="card-statusCheck">
+    <div class="card-header">
+      <span class="card-title">매칭결과 확인</span>
+      <span class="badge badge-off" id="badge-statusCheck">스케줄 없음</span>
+    </div>
+    <div class="run-section">
+      <label>즉시 실행</label>
+      <div style="display:flex;gap:6px;">
+        <button class="btn-run" onclick="runNow('statusCheck:new')">신규매칭</button>
+        <button class="btn-run" onclick="runNow('statusCheck:rematch')">재매칭</button>
+        <button class="btn-run" onclick="runNow('statusCheck')">전체</button>
+      </div>
+    </div>
+    <div class="sched-toggle-header" onclick="toggleSched('statusCheck')">
+      <span class="arrow" id="sched-arrow-statusCheck">&#9654;</span>
+      <span class="label">스케줄 설정</span>
+    </div>
+    <div class="sched-body collapsed" id="sched-body-statusCheck">
+      <div class="schedule-section" data-job="statusCheck"></div>
+    </div>
+  </div>
+
+  <!-- 월별 관리 -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">월별 탭 관리</span>
+    </div>
+    <button class="btn-monthly" onclick="if(confirm('새 월별 탭을 생성하고 전월 잔여건을 이월합니다. 진행할까요?')) runNow('monthly')">월별 탭 생성 (월초 1회)</button>
+  </div>
+
+        <!-- 로그 -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">실행 로그</span>
+          </div>
+          <div id="log-box"></div>
+        </div>
+      </section>
+
+      <!-- 워크플로우 -->
+      <section class="view" id="view-workflow">
+        <h1>워크플로우</h1>
+        <div class="wf-toolbar">
+          <input class="wf-rename" id="wf-preset-name" placeholder="프리셋 이름" />
+          <button class="wf-btn wf-btn-save" onclick="savePreset()">저장</button>
+          <button class="wf-btn wf-btn-clear" onclick="clearWorkspace()">초기화</button>
+          <button class="wf-btn wf-btn-run" onclick="runWorkflow()" style="margin-left:auto;">▶ 실행</button>
+        </div>
+
+        <div class="wf-area">
+          <!-- 블럭 팔레트 -->
+          <div class="wf-palette">
+            <div class="wf-section-title">시트 정리</div>
+            <div class="wf-block cat-prep" draggable="true" ondragstart="dragStart(event,'prep:new','신규 시트 정리','prep')" onclick="addBlock('prep:new','신규 시트 정리','prep')">신규 시트 정리</div>
+            <div class="wf-block cat-prep" draggable="true" ondragstart="dragStart(event,'prep:rematch','재매칭 시트 정리','prep')" onclick="addBlock('prep:rematch','재매칭 시트 정리','prep')">재매칭 시트 정리</div>
+            <div class="wf-block cat-prep" draggable="true" ondragstart="dragStart(event,'prep','전체 시트 정리','prep')" onclick="addBlock('prep','전체 시트 정리','prep')">전체 시트 정리</div>
+
+            <div class="wf-section-title">페어링</div>
+            <div class="wf-block cat-pairing" draggable="true" ondragstart="dragStart(event,'pairing','페어링 생성','pairing')" onclick="addBlock('pairing','페어링 생성','pairing')">페어링 생성</div>
+
+            <div class="wf-section-title">매칭 제안 (AIM)</div>
+            <div class="wf-block cat-aim" draggable="true" ondragstart="dragStart(event,'aim:new','신규 매칭 제안','aim')" onclick="addBlock('aim:new','신규 매칭 제안','aim')">신규 매칭 제안</div>
+            <div class="wf-block cat-aim" draggable="true" ondragstart="dragStart(event,'aim:rematch','재매칭 제안','aim')" onclick="addBlock('aim:rematch','재매칭 제안','aim')">재매칭 제안</div>
+            <div class="wf-block cat-aim" draggable="true" ondragstart="dragStart(event,'aim','전체 매칭 제안','aim')" onclick="addBlock('aim','전체 매칭 제안','aim')">전체 매칭 제안</div>
+
+            <div class="wf-section-title">매칭결과 확인</div>
+            <div class="wf-block cat-status" draggable="true" ondragstart="dragStart(event,'statusCheck:new','신규 매칭결과 확인','status')" onclick="addBlock('statusCheck:new','신규 매칭결과 확인','status')">신규 매칭결과 확인</div>
+            <div class="wf-block cat-status" draggable="true" ondragstart="dragStart(event,'statusCheck:rematch','재매칭 결과 확인','status')" onclick="addBlock('statusCheck:rematch','재매칭 결과 확인','status')">재매칭 결과 확인</div>
+            <div class="wf-block cat-status" draggable="true" ondragstart="dragStart(event,'statusCheck','전체 매칭결과 확인','status')" onclick="addBlock('statusCheck','전체 매칭결과 확인','status')">전체 매칭결과 확인</div>
+
+            <div class="wf-section-title">월별 관리</div>
+            <div class="wf-block cat-monthly" draggable="true" ondragstart="dragStart(event,'monthly','월별 탭 생성','monthly')" onclick="addBlock('monthly','월별 탭 생성','monthly')">월별 탭 생성</div>
+
+            <div class="wf-section-title">제어</div>
+            <div class="wf-block cat-control" onclick="addLoop()">반복 N회</div>
+            <div class="wf-block cat-control" onclick="addCondLoop()">조건 반복</div>
+          </div>
+
+          <!-- 워크스페이스 -->
+          <div class="wf-workspace">
+            <div class="wf-workspace-list" id="wf-ws-list"
+                 ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="dropOnWorkspace(event)">
+              <div class="wf-empty-msg">왼쪽 블럭을 드래그하거나 클릭하면 여기에 추가됩니다</div>
+            </div>
+          </div>
+
+          <!-- 프리셋 목록 -->
+          <div class="wf-presets">
+            <div class="wf-section-title">프리셋</div>
+            <div id="wf-preset-list"></div>
+            <button class="wf-add-preset" onclick="addPreset()">+ 새 프리셋</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 당일 현황 -->
+      <section class="view" id="view-status">
+        <h1>당일 현황</h1>
+        <div class="empty-view">아직 비어있어요</div>
+      </section>
+
+      <!-- 대시보드 -->
+      <section class="view" id="view-dashboard">
+        <h1>대시보드</h1>
+        <div class="empty-view">아직 비어있어요</div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    function switchView(name) {
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      document.getElementById('view-' + name).classList.add('active');
+      document.querySelectorAll('.sidebar-menu li').forEach(li => {
+        li.classList.toggle('active', li.dataset.view === name);
+      });
+    }
+
+    function toggleSched(id) {
+      const body = document.getElementById('sched-body-' + id);
+      const arrow = document.getElementById('sched-arrow-' + id);
+      const isOpen = body.classList.contains('expanded');
+      body.classList.toggle('expanded', !isOpen);
+      body.classList.toggle('collapsed', isOpen);
+      arrow.classList.toggle('open', !isOpen);
+    }
+
+    const DAY_NAMES = ['일','월','화','수','목','금','토'];
+    const INTERVALS = [5, 10, 20, 30, 40, 50, 60, 90, 120];
+    const SCHEDULE_JOBS = ['prep', 'pairing', 'aim', 'statusCheck'];
+
+    // --- 스케줄 UI 렌더링 ---
+    function initScheduleSections() {
+      document.querySelectorAll('.schedule-section').forEach(section => {
+        const jobId = section.dataset.job;
+        section.innerHTML = `
+          <label style="font-size:13px;color:#666;font-weight:500;display:block;margin-bottom:6px;">스케줄 설정</label>
+          <div class="tabs">
+            <div class="tab active" data-tab="interval" onclick="switchTab('${jobId}','interval')">주기 실행</div>
+            <div class="tab" data-tab="alarm" onclick="switchTab('${jobId}','alarm')">특정 시간</div>
+          </div>
+          <div class="tab-content" id="tab-interval-${jobId}">
+            <div class="interval-options" id="interval-opts-${jobId}">
+              ${INTERVALS.map(m => `<div class="interval-chip" data-min="${m}" onclick="selectInterval('${jobId}',${m})">${m < 60 ? m+'분' : (m/60)+'시간'}</div>`).join('')}
+            </div>
+            <button class="btn-start" onclick="addIntervalSchedule('${jobId}')">시작</button>
+          </div>
+          <div class="tab-content" id="tab-alarm-${jobId}" style="display:none;">
+            <div class="alarm-add">
+              <input type="time" class="time-input" id="alarm-time-${jobId}" value="09:00">
+              <div class="day-chips" id="alarm-days-${jobId}">
+                ${DAY_NAMES.map((d,i) => `<div class="day-chip" data-day="${i}" onclick="toggleDay(this)">${d}</div>`).join('')}
+              </div>
+              <button class="btn-start btn-small" onclick="addAlarmSchedule('${jobId}')">+ 추가</button>
+            </div>
+          </div>
+          <div class="schedule-list" id="sched-list-${jobId}"></div>
+        `;
+      });
+    }
+
+    const selectedIntervals = {};
+
+    function switchTab(jobId, tab) {
+      const section = document.querySelector(`.schedule-section[data-job="${jobId}"]`);
+      section.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+      document.getElementById(`tab-interval-${jobId}`).style.display = tab === 'interval' ? '' : 'none';
+      document.getElementById(`tab-alarm-${jobId}`).style.display = tab === 'alarm' ? '' : 'none';
+    }
+
+    function selectInterval(jobId, min) {
+      selectedIntervals[jobId] = min;
+      document.querySelectorAll(`#interval-opts-${jobId} .interval-chip`).forEach(c =>
+        c.classList.toggle('selected', Number(c.dataset.min) === min)
+      );
+    }
+
+    function toggleDay(el) {
+      el.classList.toggle('selected');
+    }
+
+    // --- API 호출 ---
+    async function runNow(jobId) {
+      setRunning(jobId);
+      try {
+        const res = await fetch(`/api/run/${jobId}`, { method: 'POST' });
+        const data = await res.json();
+        if (!data.ok) appendLog('[ERROR] ' + data.message, 'error');
+      } catch (e) {
+        appendLog('[ERROR] ' + e.message, 'error');
+      }
+      setIdle();
+      fetchLogs();
+    }
+
+    async function addIntervalSchedule(jobId) {
+      const mins = selectedIntervals[jobId];
+      if (!mins) { alert('간격을 선택하세요'); return; }
+      const res = await fetch('/api/schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId, type: 'interval', options: { minutes: mins } })
+      });
+      const data = await res.json();
+      if (data.ok) fetchSchedules();
+    }
+
+    async function addAlarmSchedule(jobId) {
+      const timeVal = document.getElementById(`alarm-time-${jobId}`).value;
+      if (!timeVal) { alert('시간을 입력하세요'); return; }
+      const [hh, mm] = timeVal.split(':').map(Number);
+      const dayChips = document.querySelectorAll(`#alarm-days-${jobId} .day-chip.selected`);
+      const days = Array.from(dayChips).map(c => Number(c.dataset.day));
+
+      const res = await fetch('/api/schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId, type: 'alarm', options: { hour: hh, minute: mm, days } })
+      });
+      const data = await res.json();
+      if (data.ok) fetchSchedules();
+    }
+
+    async function removeSchedule(id) {
+      await fetch(`/api/schedule/${id}`, { method: 'DELETE' });
+      fetchSchedules();
+    }
+
+    async function toggleSchedule(id, enabled) {
+      await fetch(`/api/schedule/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled })
+      });
+      fetchSchedules();
+    }
+
+    async function fetchSchedules() {
+      try {
+        const res = await fetch('/api/schedules');
+        const list = await res.json();
+        // 목록별 분류
+        SCHEDULE_JOBS.forEach(jobId => {
+          const container = document.getElementById(`sched-list-${jobId}`);
+          const badge = document.getElementById(`badge-${jobId}`);
+          const items = list.filter(s => s.jobId === jobId || s.jobId.startsWith(jobId + ':'));
+          if (!container) return;
+
+          if (items.length === 0) {
+            container.innerHTML = '';
+            if (badge) { badge.textContent = '스케줄 없음'; badge.className = 'badge badge-off'; }
+            return;
+          }
+
+          const activeCount = items.filter(s => s.enabled).length;
+          if (badge) {
+            badge.textContent = `${activeCount}개 활성`;
+            badge.className = activeCount > 0 ? 'badge badge-active' : 'badge badge-off';
+          }
+
+          container.innerHTML = items.map(s => `
+            <div class="schedule-item">
+              <div class="left">
+                <label class="toggle">
+                  <input type="checkbox" ${s.enabled ? 'checked' : ''} onchange="toggleSchedule(${s.id}, this.checked)">
+                  <span class="toggle-slider"></span>
+                </label>
+                <div>
+                  <div class="time-label">${s.label}</div>
+                  <div class="type-label">${s.type === 'interval' ? '주기 실행' : '특정 시간'}</div>
+                </div>
+              </div>
+              <button class="btn-ghost" onclick="removeSchedule(${s.id})">삭제</button>
+            </div>
+          `).join('');
+        });
+      } catch (e) {}
+    }
+
+    // --- 상태 & 로그 ---
+    const logBox = document.getElementById('log-box');
+
+    function setRunning(name) {
+      const bar = document.getElementById('status-bar');
+      bar.className = 'status-bar status-running';
+      bar.innerHTML = `<div class="spinner"></div><span>${name} 실행 중...</span><button class="btn-abort" onclick="stopTask()">중단하기</button>`;
+      document.querySelectorAll('button:not(.btn-abort)').forEach(b => b.disabled = true);
+    }
+
+    async function stopTask() {
+      try {
+        const res = await fetch('/api/stop', { method: 'POST' });
+        const data = await res.json();
+        if (!data.ok) appendLog('[INFO] ' + data.message);
+      } catch (e) { appendLog('[ERROR] ' + e.message, 'error'); }
+    }
+
+    function setIdle() {
+      const bar = document.getElementById('status-bar');
+      bar.className = 'status-bar status-idle';
+      bar.innerHTML = '<span>대기 중</span>';
+      document.querySelectorAll('button').forEach(b => b.disabled = false);
+    }
+
+    function appendLog(text, cls) {
+      const line = document.createElement('div');
+      if (cls) line.className = cls;
+      line.textContent = text;
+      logBox.appendChild(line);
+      logBox.scrollTop = logBox.scrollHeight;
+    }
+
+    async function fetchLogs() {
+      try {
+        const res = await fetch('/api/logs');
+        const data = await res.json();
+        logBox.innerHTML = '';
+        data.logs.forEach(log => {
+          const cls = log.includes('[ERROR]') ? 'error'
+            : (log.includes('완료') || log.includes('성공')) ? 'success' : '';
+          appendLog(log, cls);
+        });
+        if (data.running) setRunning(data.running); else setIdle();
+      } catch (e) {}
+    }
+
+    // ===== 워크플로우 (스크래치 UI) =====
+    const WF_INDEX_KEY = 'wfPresetIndex'; // [{id, name}]
+    const WF_DATA_PREFIX = 'wfPresetData_';
+    let wfWorkspace = []; // [{kind:'job', jobId, label, cat} | {kind:'loop'} | {kind:'condLoop'}]
+    let wfPresets = []; // [{id, name}]
+    let wfCurrentId = null;
+
+    function addBlock(jobId, label, cat) {
+      wfWorkspace.push({ kind: 'job', jobId, label, cat });
+      renderWorkspace();
+    }
+
+    // ===== Drag & Drop =====
+    function dragStart(e, jobId, label, cat) {
+      e.stopPropagation();
+      e.dataTransfer.setData('application/json', JSON.stringify({ source: 'palette', jobId, label, cat }));
+      e.dataTransfer.effectAllowed = 'copy';
+    }
+    function dragStartWS(e, path) {
+      e.stopPropagation();
+      e.dataTransfer.setData('application/json', JSON.stringify({ source: 'workspace', path }));
+      e.dataTransfer.effectAllowed = 'move';
+    }
+    function dragOver(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = 'move';
+      e.currentTarget.classList.add('drag-over');
+    }
+    function dragLeave(e) {
+      if (!e.currentTarget.contains(e.relatedTarget)) {
+        e.currentTarget.classList.remove('drag-over');
+      }
+    }
+
+    // path 비교
+    function pathStartsWith(longer, shorter) {
+      if (longer.length < shorter.length) return false;
+      for (let i = 0; i < shorter.length; i++) if (longer[i] !== shorter[i]) return false;
+      return true;
+    }
+    // 컨테이너 path → children 배열 참조 (workspace 최상위는 [])
+    function getContainerArray(containerPath) {
+      if (!containerPath || containerPath.length === 0) return wfWorkspace;
+      let cur = wfWorkspace[containerPath[0]];
+      for (let i = 1; i < containerPath.length; i++) cur = cur.children[containerPath[i]];
+      return cur.children;
+    }
+    // source path에서 블럭 제거 후 반환
+    function removeBlockAt(path) {
+      let parent = wfWorkspace;
+      for (let i = 0; i < path.length - 1; i++) parent = parent[path[i]].children;
+      return parent.splice(path[path.length - 1], 1)[0];
+    }
+
+    function handleDrop(targetContainerPath, data) {
+      if (data.source === 'palette') {
+        getContainerArray(targetContainerPath).push({ kind: 'job', jobId: data.jobId, label: data.label, cat: data.cat });
+      } else if (data.source === 'workspace') {
+        const sourcePath = data.path;
+        // 컨테이너를 자기 자신/자손에 떨어뜨리지 못하게
+        if (pathStartsWith(targetContainerPath, sourcePath)) return;
+        // target 배열 참조를 미리 확보 (제거 후에도 유효)
+        const targetArr = getContainerArray(targetContainerPath);
+        const block = removeBlockAt(sourcePath);
+        targetArr.push(block);
+      }
+      renderWorkspace();
+    }
+
+    function dropOnWorkspace(e) {
+      e.preventDefault();
+      e.currentTarget.classList.remove('drag-over');
+      try {
+        const data = JSON.parse(e.dataTransfer.getData('application/json'));
+        handleDrop([], data);
+      } catch {}
+    }
+    function dropOnContainer(e, path) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.currentTarget.classList.remove('drag-over');
+      try {
+        const data = JSON.parse(e.dataTransfer.getData('application/json'));
+        handleDrop(path, data);
+      } catch {}
+    }
+
+    function addLoop() {
+      wfWorkspace.push({ kind: 'loop', count: 2, children: [] });
+      renderWorkspace();
+    }
+
+    function addCondLoop() {
+      wfWorkspace.push({
+        kind: 'condLoop',
+        condType: 'new',        // new | rematch
+        condStatus: '',         // 빈 문자열 = 미처리
+        condOp: '<=',           // <= | >= | =
+        condValue: 0,
+        maxIter: 5,
+        children: [],
+      });
+      renderWorkspace();
+    }
+
+    function removeBlock(path) {
+      // path 예: [0] or [2, 1] (loop 안의 인덱스)
+      const idx = path[path.length - 1];
+      let parent = wfWorkspace;
+      for (let i = 0; i < path.length - 1; i++) parent = parent[path[i]].children;
+      parent.splice(idx, 1);
+      renderWorkspace();
+    }
+
+    function moveBlock(path, dir) {
+      const idx = path[path.length - 1];
+      let parent = wfWorkspace;
+      for (let i = 0; i < path.length - 1; i++) parent = parent[path[i]].children;
+      const newIdx = idx + dir;
+      if (newIdx < 0 || newIdx >= parent.length) return;
+      [parent[idx], parent[newIdx]] = [parent[newIdx], parent[idx]];
+      renderWorkspace();
+    }
+
+    function updateLoopCount(path, val) {
+      let target = wfWorkspace;
+      for (let i = 0; i < path.length - 1; i++) target = target[path[i]].children;
+      target[path[path.length - 1]].count = Math.max(1, parseInt(val) || 1);
+    }
+
+    function moveBlockIntoLoop(path, loopPath) {
+      // 일단 미사용 (drag&drop 미구현 상태)
+    }
+
+    function renderBlock(b, path) {
+      const pathStr = JSON.stringify(path);
+      if (b.kind === 'job') {
+        return `
+          <div class="wf-ws-block cat-${b.cat}" draggable="true" ondragstart='dragStartWS(event, ${pathStr})'>
+            <span>${escapeHtml(b.label)}</span>
+            <div class="wf-ws-actions">
+              <button title="위로" onclick='moveBlock(${pathStr}, -1)'>↑</button>
+              <button title="아래로" onclick='moveBlock(${pathStr}, 1)'>↓</button>
+              <button title="삭제" onclick='removeBlock(${pathStr})'>×</button>
+            </div>
+          </div>
+        `;
+      } else if (b.kind === 'loop') {
+        return renderContainerBlock(b, path, pathStr,
+          `반복 <input type="number" class="wf-loop-count" min="1" value="${b.count}" onchange='updateLoopCount(${pathStr}, this.value)'> 회`
+        );
+      } else if (b.kind === 'condLoop') {
+        const condUI = `
+          조건:
+          <select onchange='updateCondField(${pathStr},"condType",this.value)'>
+            <option value="new" ${b.condType==='new'?'selected':''}>신규</option>
+            <option value="rematch" ${b.condType==='rematch'?'selected':''}>재매칭</option>
+          </select>
+          <select onchange='updateCondField(${pathStr},"condStatus",this.value)'>
+            <option value="" ${b.condStatus===''?'selected':''}>미처리</option>
+            <option value="매칭중" ${b.condStatus==='매칭중'?'selected':''}>매칭중</option>
+            <option value="확인 필요" ${b.condStatus==='확인 필요'?'selected':''}>확인 필요</option>
+            <option value="보류" ${b.condStatus==='보류'?'selected':''}>보류</option>
+            <option value="첫수업전재매칭" ${b.condStatus==='첫수업전재매칭'?'selected':''}>첫수업전재매칭</option>
+            <option value="일반 재매칭" ${b.condStatus==='일반 재매칭'?'selected':''}>일반 재매칭</option>
+          </select>
+          건수
+          <select onchange='updateCondField(${pathStr},"condOp",this.value)'>
+            <option value="<=" ${b.condOp==='<='?'selected':''}>≤</option>
+            <option value=">=" ${b.condOp==='>='?'selected':''}>≥</option>
+            <option value="=" ${b.condOp==='='?'selected':''}>=</option>
+          </select>
+          <input type="number" min="0" value="${b.condValue}" style="width:50px" onchange='updateCondField(${pathStr},"condValue",this.value)'>
+          까지 (최대 <input type="number" min="1" value="${b.maxIter}" style="width:40px" onchange='updateCondField(${pathStr},"maxIter",this.value)'>회)
+        `;
+        return renderCondContainer(b, path, pathStr, condUI);
+      }
+      return '';
+    }
+
+    function renderContainerBlock(b, path, pathStr, headerHTML) {
+      const childrenHtml = b.children.length === 0
+        ? '<div class="wf-empty-msg" style="color:rgba(255,255,255,.6);padding:10px;">자식 블럭을 추가하세요</div>'
+        : b.children.map((c, i) => renderBlock(c, [...path, i])).join('');
+      return `
+        <div class="wf-loop-block" draggable="true" ondragstart='dragStartWS(event, ${pathStr})'>
+          <div class="wf-loop-header">
+            <span>${headerHTML}</span>
+            <div class="wf-ws-actions">
+              <button title="위로" onclick='moveBlock(${pathStr}, -1)'>↑</button>
+              <button title="아래로" onclick='moveBlock(${pathStr}, 1)'>↓</button>
+              <button title="삭제" onclick='removeBlock(${pathStr})'>×</button>
+            </div>
+          </div>
+          <div class="wf-loop-children" ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="dropOnContainer(event, ${pathStr})">
+            ${childrenHtml}
+            ${childAdderSelect(pathStr)}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderCondContainer(b, path, pathStr, headerHTML) {
+      const childrenHtml = b.children.length === 0
+        ? '<div class="wf-empty-msg" style="color:rgba(255,255,255,.6);padding:10px;">자식 블럭을 추가하세요</div>'
+        : b.children.map((c, i) => renderBlock(c, [...path, i])).join('');
+      return `
+        <div class="wf-cond-block" draggable="true" ondragstart='dragStartWS(event, ${pathStr})'>
+          <div class="wf-cond-header">
+            <span>${headerHTML}</span>
+            <div class="wf-ws-actions">
+              <button title="위로" onclick='moveBlock(${pathStr}, -1)'>↑</button>
+              <button title="아래로" onclick='moveBlock(${pathStr}, 1)'>↓</button>
+              <button title="삭제" onclick='removeBlock(${pathStr})'>×</button>
+            </div>
+          </div>
+          <div class="wf-loop-children" ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="dropOnContainer(event, ${pathStr})">
+            ${childrenHtml}
+            ${childAdderSelect(pathStr)}
+          </div>
+        </div>
+      `;
+    }
+
+    function childAdderSelect(pathStr) {
+      return `
+        <div style="margin-top:6px;">
+          <select onchange="addToLoop(${pathStr}, this); this.value='';" style="background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.3);color:#fff;padding:4px 8px;border-radius:4px;font-size:12px;">
+            <option value="">+ 블럭 추가</option>
+            <option value='{"jobId":"prep:new","label":"신규 시트 정리","cat":"prep"}'>신규 시트 정리</option>
+            <option value='{"jobId":"prep:rematch","label":"재매칭 시트 정리","cat":"prep"}'>재매칭 시트 정리</option>
+            <option value='{"jobId":"prep","label":"전체 시트 정리","cat":"prep"}'>전체 시트 정리</option>
+            <option value='{"jobId":"pairing","label":"페어링 생성","cat":"pairing"}'>페어링 생성</option>
+            <option value='{"jobId":"aim:new","label":"신규 매칭 제안","cat":"aim"}'>신규 매칭 제안</option>
+            <option value='{"jobId":"aim:rematch","label":"재매칭 제안","cat":"aim"}'>재매칭 제안</option>
+            <option value='{"jobId":"aim","label":"전체 매칭 제안","cat":"aim"}'>전체 매칭 제안</option>
+            <option value='{"jobId":"statusCheck:new","label":"신규 매칭결과 확인","cat":"status"}'>신규 매칭결과 확인</option>
+            <option value='{"jobId":"statusCheck:rematch","label":"재매칭 결과 확인","cat":"status"}'>재매칭 결과 확인</option>
+            <option value='{"jobId":"statusCheck","label":"전체 매칭결과 확인","cat":"status"}'>전체 매칭결과 확인</option>
+            <option value='{"jobId":"monthly","label":"월별 탭 생성","cat":"monthly"}'>월별 탭 생성</option>
+          </select>
+        </div>
+      `;
+    }
+
+    function updateCondField(path, field, val) {
+      let parent = wfWorkspace;
+      for (let i = 0; i < path.length - 1; i++) parent = parent[path[i]].children;
+      const target = parent[path[path.length - 1]];
+      if (field === 'condValue' || field === 'maxIter') target[field] = parseInt(val) || 0;
+      else target[field] = val;
+    }
+
+    function addToLoop(loopPath, selectEl) {
+      if (!selectEl.value) return;
+      const block = JSON.parse(selectEl.value);
+      let target = wfWorkspace;
+      for (let i = 0; i < loopPath.length; i++) target = target[loopPath[i]].children || target[loopPath[i]];
+      // loopPath가 가리키는 건 loop 자신
+      let parent = wfWorkspace;
+      for (let i = 0; i < loopPath.length - 1; i++) parent = parent[loopPath[i]].children;
+      parent[loopPath[loopPath.length - 1]].children.push({ kind: 'job', ...block });
+      renderWorkspace();
+    }
+
+    function renderWorkspace() {
+      const list = document.getElementById('wf-ws-list');
+      if (wfWorkspace.length === 0) {
+        list.innerHTML = '<div class="wf-empty-msg">왼쪽 블럭을 클릭하면 여기에 추가됩니다</div>';
+        return;
+      }
+      list.innerHTML = wfWorkspace.map((b, i) => renderBlock(b, [i])).join('');
+    }
+
+    function escapeHtml(s) {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    function clearWorkspace() {
+      if (!confirm('현재 워크스페이스를 비웁니다. 진행할까요?')) return;
+      wfWorkspace = [];
+      renderWorkspace();
+    }
+
+    // ===== 프리셋 다중 관리 =====
+    function loadPresetIndex() {
+      try {
+        wfPresets = JSON.parse(localStorage.getItem(WF_INDEX_KEY) || '[]');
+      } catch { wfPresets = []; }
+      if (wfPresets.length === 0) {
+        // 처음 사용자는 기본 프리셋 1개 생성
+        const id = Date.now().toString();
+        wfPresets = [{ id, name: '프리셋 1' }];
+        savePresetIndex();
+      }
+    }
+
+    function savePresetIndex() {
+      localStorage.setItem(WF_INDEX_KEY, JSON.stringify(wfPresets));
+    }
+
+    function renderPresetList() {
+      const list = document.getElementById('wf-preset-list');
+      list.innerHTML = wfPresets.map(p => {
+        const blockCount = (() => {
+          try {
+            const d = JSON.parse(localStorage.getItem(WF_DATA_PREFIX + p.id) || '{}');
+            return (d.workspace || []).length;
+          } catch { return 0; }
+        })();
+        return `
+          <div class="wf-preset-item ${p.id === wfCurrentId ? 'active' : ''}" onclick="selectPreset('${p.id}')">
+            <div style="flex:1;min-width:0;">
+              <div class="wf-preset-name">${escapeHtml(p.name)}</div>
+              <div class="wf-preset-meta">${blockCount}개 블럭</div>
+            </div>
+            <button class="wf-preset-del" onclick="event.stopPropagation();deletePreset('${p.id}')" title="삭제">×</button>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function selectPreset(id) {
+      // 현재 작업중 변경 사항 자동 저장
+      if (wfCurrentId) saveCurrentWorkspace();
+      wfCurrentId = id;
+      const raw = localStorage.getItem(WF_DATA_PREFIX + id);
+      if (raw) {
+        try {
+          const data = JSON.parse(raw);
+          wfWorkspace = data.workspace || [];
+        } catch { wfWorkspace = []; }
+      } else {
+        wfWorkspace = [];
+      }
+      const preset = wfPresets.find(p => p.id === id);
+      document.getElementById('wf-preset-name').value = preset ? preset.name : '';
+      renderWorkspace();
+      renderPresetList();
+    }
+
+    function saveCurrentWorkspace() {
+      if (!wfCurrentId) return;
+      localStorage.setItem(WF_DATA_PREFIX + wfCurrentId, JSON.stringify({ workspace: wfWorkspace }));
+    }
+
+    function savePreset() {
+      if (!wfCurrentId) { alert('프리셋이 선택되지 않았습니다'); return; }
+      const newName = document.getElementById('wf-preset-name').value.trim() || '이름 없음';
+      const preset = wfPresets.find(p => p.id === wfCurrentId);
+      if (preset) preset.name = newName;
+      savePresetIndex();
+      saveCurrentWorkspace();
+      renderPresetList();
+      alert('저장 완료');
+    }
+
+    function addPreset() {
+      const name = prompt('새 프리셋 이름:', `프리셋 ${wfPresets.length + 1}`);
+      if (!name) return;
+      const id = Date.now().toString();
+      wfPresets.push({ id, name });
+      savePresetIndex();
+      localStorage.setItem(WF_DATA_PREFIX + id, JSON.stringify({ workspace: [] }));
+      selectPreset(id);
+    }
+
+    function deletePreset(id) {
+      const p = wfPresets.find(x => x.id === id);
+      if (!confirm(`"${p ? p.name : ''}" 프리셋을 삭제할까요?`)) return;
+      wfPresets = wfPresets.filter(x => x.id !== id);
+      localStorage.removeItem(WF_DATA_PREFIX + id);
+      savePresetIndex();
+      if (wfCurrentId === id) {
+        if (wfPresets.length > 0) selectPreset(wfPresets[0].id);
+        else {
+          wfCurrentId = null;
+          wfWorkspace = [];
+          document.getElementById('wf-preset-name').value = '';
+          renderWorkspace();
+        }
+      }
+      renderPresetList();
+    }
+
+    async function runOne(jobId) {
+      await fetch(`/api/run/${jobId}`, { method: 'POST' });
+      await new Promise(r => setTimeout(r, 800));
+    }
+
+    async function checkCondition(cond) {
+      try {
+        const url = `/api/wf/count?type=${cond.condType}&status=${encodeURIComponent(cond.condStatus)}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        const cnt = data.count || 0;
+        if (cond.condOp === '<=') return cnt <= cond.condValue;
+        if (cond.condOp === '>=') return cnt >= cond.condValue;
+        if (cond.condOp === '=') return cnt === cond.condValue;
+      } catch (e) { console.error('조건 체크 에러:', e); }
+      return false;
+    }
+
+    async function runBlocks(blocks) {
+      for (const b of blocks) {
+        if (b.kind === 'job') {
+          await runOne(b.jobId);
+        } else if (b.kind === 'loop') {
+          for (let r = 0; r < b.count; r++) {
+            await runBlocks(b.children);
+          }
+        } else if (b.kind === 'condLoop') {
+          for (let r = 0; r < b.maxIter; r++) {
+            // 매 회차 시작 전 조건 체크
+            if (await checkCondition(b)) {
+              console.log(`[wf] 조건 만족 — ${r}회차에 종료`);
+              break;
+            }
+            await runBlocks(b.children);
+          }
+        }
+      }
+    }
+
+    function countAllJobs(blocks) {
+      let n = 0;
+      for (const b of blocks) {
+        if (b.kind === 'job') n++;
+        else if (b.kind === 'loop') n += b.count * countAllJobs(b.children);
+        else if (b.kind === 'condLoop') n += b.maxIter * countAllJobs(b.children);
+      }
+      return n;
+    }
+
+    async function runWorkflow() {
+      if (wfWorkspace.length === 0) { alert('실행할 블럭이 없습니다'); return; }
+      const maxJobs = countAllJobs(wfWorkspace);
+      if (!confirm(`최대 ${maxJobs}개 작업을 실행합니다.\n진행할까요?`)) return;
+      try {
+        await runBlocks(wfWorkspace);
+        alert('워크플로우 실행 완료');
+      } catch (e) {
+        alert('실행 에러: ' + e.message);
+      }
+    }
+
+    // 초기 로드
+    loadPresetIndex();
+    if (wfPresets.length > 0) selectPreset(wfPresets[0].id);
+    else renderPresetList();
+
+    // --- 유저메모 필터 토글 ---
+    let memoFilter = 'initial';
+    function setMemoFilter(f) {
+      memoFilter = f;
+      document.getElementById('memo-filter-all').style.background = f === 'all' ? '#1976d2' : '#fff';
+      document.getElementById('memo-filter-all').style.color = f === 'all' ? '#fff' : '#333';
+      document.getElementById('memo-filter-initial').style.background = f === 'initial' ? '#1976d2' : '#fff';
+      document.getElementById('memo-filter-initial').style.color = f === 'initial' ? '#fff' : '#333';
+    }
+    function openMemo(type) {
+      const filterParam = memoFilter === 'initial' ? '&filter=initial' : '';
+      window.open(`/userMemo.html?type=${type}${filterParam}`, '_blank');
+    }
+    function openMemoAll() {
+      const filterParam = memoFilter === 'initial' ? '&filter=initial' : '';
+      window.open(`/userMemo.html?type=new${filterParam}&autoNext=true`, '_blank');
+    }
+
+    // 초기화
+    initScheduleSections();
+    fetchSchedules();
+    fetchLogs();
+    setInterval(() => { fetchLogs(); fetchSchedules(); }, 3000);
+
+    // --- AIM 키워드 설정 모달 ---
+    async function openAimKeywords() {
+      let modal = document.getElementById('aim-kw-modal');
+      if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'aim-kw-modal';
+        modal.innerHTML = `
+          <div style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:999;display:flex;align-items:center;justify-content:center;" onclick="if(event.target===this)this.parentElement.style.display='none'">
+            <div style="background:#fff;border-radius:10px;padding:24px;width:520px;max-height:80vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.2);">
+              <h3 style="margin:0 0 6px;font-size:16px;">매칭 제안 키워드 설정</h3>
+              <p style="font-size:12px;color:#888;margin:0 0 16px;line-height:1.5;">
+                시트 메모(신규: 매칭담당자 메모 / 재매칭: memo)에 키워드가 포함되면 해당 액션 적용.<br>
+                공백 포함/제거, 대소문자 구분 없이 모두 적용됩니다.
+              </p>
+              <div id="aim-kw-list" style="margin-bottom:16px;"></div>
+              <div style="display:flex;gap:6px;align-items:flex-end;flex-wrap:wrap;">
+                <div style="flex:1;min-width:120px;">
+                  <label style="font-size:11px;color:#666;">키워드</label>
+                  <input id="aim-kw-input" type="text" placeholder="키워드 입력" style="width:100%;padding:6px 8px;border:1px solid #d9d9d9;border-radius:4px;font-size:13px;">
+                </div>
+                <div style="min-width:140px;">
+                  <label style="font-size:11px;color:#666;">액션</label>
+                  <select id="aim-kw-action" style="width:100%;padding:6px 4px;border:1px solid #d9d9d9;border-radius:4px;font-size:13px;">
+                    <option value="exclude">매칭제안 제외</option>
+                    <option value="tutorPool">특정튜터풀에서만 매칭</option>
+                  </select>
+                </div>
+                <div id="aim-kw-ids-wrap" style="flex:1;min-width:140px;display:none;">
+                  <label style="font-size:11px;color:#666;">튜터 ID (쉼표 구분)</label>
+                  <input id="aim-kw-ids" type="text" placeholder="1234,5678" style="width:100%;padding:6px 8px;border:1px solid #d9d9d9;border-radius:4px;font-size:13px;">
+                </div>
+                <button onclick="addAimKeyword()" style="padding:6px 14px;background:#1976d2;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px;white-space:nowrap;">추가</button>
+              </div>
+            </div>
+          </div>`;
+        document.body.appendChild(modal);
+        document.getElementById('aim-kw-action').addEventListener('change', (e) => {
+          document.getElementById('aim-kw-ids-wrap').style.display = e.target.value === 'tutorPool' ? 'block' : 'none';
+        });
+      }
+      modal.style.display = 'block';
+      await renderAimKeywords();
+    }
+
+    async function renderAimKeywords() {
+      const res = await fetch('/api/aim/keywords');
+      const keywords = await res.json();
+      const list = document.getElementById('aim-kw-list');
+      if (keywords.length === 0) {
+        list.innerHTML = '<p style="color:#aaa;font-size:13px;">등록된 키워드 없음</p>';
+        return;
+      }
+      list.innerHTML = keywords.map((kw, i) => {
+        const actionLabel = kw.action === 'exclude' ? '<span style="color:#e53935;">제외</span>' : '<span style="color:#1976d2;">튜터풀</span>';
+        const idsInfo = kw.tutorIds ? ` <span style="color:#888;font-size:11px;">[${kw.tutorIds}]</span>` : '';
+        return '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:#f5f5f5;border-radius:5px;margin-bottom:4px;font-size:13px;">'
+          + '<span style="font-weight:500;">' + kw.keyword + '</span>'
+          + '<span style="margin-left:4px;">' + actionLabel + '</span>'
+          + idsInfo
+          + '<button onclick="deleteAimKeyword(' + i + ')" style="margin-left:auto;background:none;border:none;color:#999;cursor:pointer;font-size:16px;">&times;</button>'
+          + '</div>';
+      }).join('');
+    }
+
+    async function addAimKeyword() {
+      const keyword = document.getElementById('aim-kw-input').value.trim();
+      const action = document.getElementById('aim-kw-action').value;
+      const tutorIds = document.getElementById('aim-kw-ids').value.trim();
+      if (!keyword) return;
+      await fetch('/api/aim/keywords', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keyword, action, tutorIds }),
+      });
+      document.getElementById('aim-kw-input').value = '';
+      document.getElementById('aim-kw-ids').value = '';
+      await renderAimKeywords();
+    }
+
+    async function deleteAimKeyword(idx) {
+      await fetch('/api/aim/keywords/' + idx, { method: 'DELETE' });
+      await renderAimKeywords();
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>유저메모 편집</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, 'Segoe UI', sans-serif;
+      background: #f0f2f5; color: #333;
+      padding: 24px;
+    }
+
+    /* 상단 바 */
+    .top-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      background: #fff; border-radius: 12px; padding: 14px 20px;
+      margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    }
+    .top-bar .title { font-size: 18px; font-weight: 700; }
+    .top-bar .nav { display: flex; align-items: center; gap: 12px; }
+    .top-bar .counter { font-size: 14px; color: #666; }
+    .nav-btn {
+      padding: 6px 14px; border: 1px solid #ddd; border-radius: 6px;
+      background: #fff; font-size: 13px; cursor: pointer; transition: all .15s;
+    }
+    .nav-btn:hover { background: #f5f5f5; }
+    .nav-btn:disabled { opacity: .3; cursor: not-allowed; }
+    .type-badge {
+      font-size: 12px; padding: 4px 10px; border-radius: 12px; font-weight: 500;
+    }
+    .type-new, .type-rematch { background: #f0f0f0; color: #666; }
+    .type-pro { background: #ff6d00; color: #fff; font-weight: 700; }
+    .status-badge {
+      font-size: 11px; padding: 3px 10px; border-radius: 12px; font-weight: 500;
+      margin-left: 4px;
+    }
+    .status-empty { background: #e3f2fd; color: #1565c0; }
+    .status-matching { background: #fff3e0; color: #e65100; }
+    .status-done { background: #e8f5e9; color: #2e7d32; }
+    .status-check { background: #fce4ec; color: #c62828; }
+    .status-other { background: #f5f5f5; color: #666; }
+    .match-id-label { font-size: 13px; color: #999; margin-left: 8px; }
+
+    /* 섹션 */
+    .section {
+      background: #fff; border-radius: 12px; padding: 20px;
+      margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    }
+    .section-title {
+      font-size: 14px; font-weight: 600; color: #555;
+      margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #f0f0f0;
+    }
+    .section-title a { font-size: 12px; color: #1976d2; margin-left: 8px; text-decoration: none; }
+    .section-title a:hover { text-decoration: underline; }
+
+    /* 수업신청서 그리드 */
+    .form-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 10px;
+    }
+    .form-item { font-size: 13px; }
+    .form-item .label { color: #555; font-size: 12px; font-weight: 600; margin-bottom: 3px; }
+    .form-item .value { font-weight: 400; word-break: break-all; }
+    .form-item.highlight { background: #fff3e0; border: 1px solid #ffb74d; border-radius: 6px; padding: 6px 8px; }
+    .form-item.highlight .label { color: #e65100; }
+
+    /* 상단 2분할 */
+    .top-split {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;
+    }
+    @media (max-width: 900px) { .top-split { grid-template-columns: 1fr; } }
+    .top-split > .section { margin-bottom: 0; }
+
+    /* 수업신청서 2열 */
+    .form-layout {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+    }
+    @media (max-width: 700px) { .form-layout { grid-template-columns: 1fr; } }
+    .avail-block {
+      background: #fafafa; border: 1px solid #e8e8e8; border-radius: 8px; padding: 12px;
+    }
+    .avail-block-title { font-size: 13px; font-weight: 600; color: #555; margin-bottom: 8px; }
+    .avail-row { display: flex; align-items: baseline; gap: 8px; font-size: 13px; margin-bottom: 4px; }
+    .avail-day { font-weight: 600; width: 16px; text-align: center; color: #555; }
+    .avail-hours { color: #444; }
+
+    /* 3열 */
+    .three-col {
+      display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px;
+    }
+    @media (max-width: 900px) { .three-col { grid-template-columns: 1fr; } }
+    .memo-col-title { font-size: 13px; font-weight: 600; color: #555; margin-bottom: 8px; }
+    .memo-content {
+      background: #fafafa; border: 1px solid #e8e8e8; border-radius: 8px;
+      padding: 12px; font-size: 13px; line-height: 1.7;
+      min-height: 180px; max-height: 400px; overflow-y: auto;
+      white-space: pre-wrap; color: #444;
+    }
+
+    /* Slack 메시지 */
+    .slack-msg {
+      background: #fafafa; border: 1px solid #e8e8e8; border-radius: 8px;
+      padding: 12px; margin-bottom: 8px; font-size: 13px; line-height: 1.6;
+      white-space: pre-wrap;
+    }
+    .slack-msg .meta {
+      font-size: 11px; color: #999; margin-top: 6px;
+      display: flex; justify-content: space-between;
+    }
+    .slack-msg .meta a { color: #1976d2; text-decoration: none; }
+
+    /* 튜터메모 */
+    .tutor-memo-area {
+      width: 100%; min-height: 150px; padding: 12px;
+      border: 1px solid #ddd; border-radius: 8px; font-size: 13px;
+      line-height: 1.7; resize: vertical;
+      font-family: -apple-system, 'Segoe UI', sans-serif;
+    }
+    .tutor-memo-area:focus { outline: none; border-color: #1976d2; }
+
+    /* 버튼 */
+    .action-bar { display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; }
+    button {
+      padding: 10px 20px; border: none; border-radius: 8px;
+      font-size: 14px; font-weight: 500; cursor: pointer; transition: all .15s;
+    }
+    button:hover { filter: brightness(0.93); }
+    button:disabled { opacity: .4; cursor: not-allowed; }
+    .btn-ai { background: #7c4dff; color: #fff; }
+    .btn-save { background: #43a047; color: #fff; }
+
+    /* 로딩 */
+    .loading {
+      display: flex; align-items: center; justify-content: center;
+      min-height: 300px; color: #999; font-size: 14px;
+    }
+    .spinner {
+      width: 20px; height: 20px; border: 2px solid #999;
+      border-top-color: transparent; border-radius: 50%;
+      animation: spin .7s linear infinite; margin-right: 10px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .inline-loading { display: flex; align-items: center; gap: 8px; color: #999; font-size: 13px; padding: 20px; }
+    .inline-spinner {
+      width: 14px; height: 14px; border: 2px solid #bbb;
+      border-top-color: transparent; border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+
+    /* 완료 */
+    .done-screen {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; min-height: 400px; color: #666;
+    }
+    .done-screen .icon { font-size: 48px; margin-bottom: 16px; color: #43a047; }
+    .done-screen .msg { font-size: 16px; font-weight: 500; }
+    .done-screen .sub { font-size: 13px; color: #999; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <div class="top-bar">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;" id="top-info">
+      <span class="type-badge" id="type-badge"></span>
+      <span id="info-line" style="font-size:14px;font-weight:500;"></span>
+    </div>
+    <div class="nav">
+      <button class="nav-btn" id="btn-prev" onclick="goPrev()">&#9664; 이전</button>
+      <span class="counter" id="counter">0 / 0</span>
+      <button class="nav-btn" id="btn-next" onclick="goNext()">다음 &#9654;</button>
+      <button class="nav-btn" onclick="goSkip()">건너뛰기</button>
+      <button class="nav-btn" onclick="openSettings()" title="헤더 설정" style="font-size:16px;padding:4px 10px;">&#9881;</button>
+    </div>
+  </div>
+
+  <!-- 설정 모달 -->
+  <div id="settings-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.4);z-index:100;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:12px;padding:24px;width:90%;max-width:600px;box-shadow:0 4px 20px rgba(0,0,0,.2);">
+      <div style="font-size:16px;font-weight:600;margin-bottom:16px;">튜터메모 헤더 설정</div>
+      <div style="font-size:13px;color:#666;margin-bottom:8px;">새 항목마다 튜터메모에 기본 입력될 헤더 텍스트</div>
+      <textarea id="header-template" style="width:100%;min-height:120px;padding:12px;border:1px solid #ddd;border-radius:8px;font-size:13px;line-height:1.7;resize:vertical;font-family:-apple-system,'Segoe UI',sans-serif;">[운영팀 안내사항] 학생이 선택한 일정 중 가장 빠른 요일부터 실제 수업 가능하신 선생님만 수락해주세요./ 일정조율 불가합니다. /
+[학생 요청사항] </textarea>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
+        <button onclick="closeSettings()" style="background:#eee;color:#666;">취소</button>
+        <button onclick="saveSettings()" style="background:#1976d2;color:#fff;">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="main-content">
+    <div class="loading" id="loading-screen">
+      <div class="spinner"></div>
+      <span>목록 불러오는 중...</span>
+    </div>
+  </div>
+
+  <div id="edit-screen" style="display:none;">
+    <!-- 수업신청서 + 튜터메모 2분할 -->
+    <div class="top-split">
+      <!-- 수업신청서 (좌) -->
+      <div class="section" id="section-form" style="display:none;">
+        <div class="section-title">수업신청서</div>
+        <div class="form-layout">
+          <div class="form-grid" id="form-grid"></div>
+          <div class="avail-block">
+            <div class="avail-block-title">가능 시간</div>
+            <div id="avail-grid"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 튜터메모 (우) -->
+      <div class="section" id="section-edit" style="display:none;">
+        <div class="section-title">튜터메모 (편집)</div>
+        <textarea class="tutor-memo-area" id="tutor-memo" placeholder="AI 편집 버튼을 눌러 자동 생성하거나 직접 입력하세요..."></textarea>
+        <div class="action-bar">
+          <button class="btn-ai" id="btn-ai" onclick="aiEdit()">AI 편집</button>
+          <button class="btn-save" id="btn-save" onclick="saveToAdmin()">어드민 저장</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 참고 자료 (하단) -->
+    <div id="detail-loading" class="section">
+      <div class="inline-loading">
+        <div class="inline-spinner"></div>
+        <span>어드민 + Slack 데이터 가져오는 중...</span>
+      </div>
+    </div>
+
+    <div class="section" id="section-refs" style="display:none;">
+      <div class="section-title">참고 자료</div>
+      <div class="three-col">
+        <div>
+          <div class="memo-col-title">시트 메모</div>
+          <div class="memo-content" id="sheet-memo" style="background:#e3f2fd;border-color:#90caf9;">-</div>
+          <div class="memo-col-title" style="margin-top:12px;">상담메모</div>
+          <div class="memo-content" id="counsel-memo">-</div>
+        </div>
+        <div>
+          <div class="memo-col-title">튜터메모</div>
+          <div class="memo-content" id="admin-tutor-memo" style="background:#fff8e1;border-color:#ffe082;">-</div>
+          <div class="memo-col-title" style="margin-top:12px;">유저메모</div>
+          <div class="memo-content" id="user-memo">-</div>
+        </div>
+        <div>
+          <div class="memo-col-title">Request (Slack)</div>
+          <div id="request-area">-</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="done-screen" class="done-screen" style="display:none;">
+    <div class="icon">&#10003;</div>
+    <div class="msg">모든 항목 처리 완료</div>
+    <div class="sub" id="done-summary"></div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const type = params.get('type') || 'new';
+
+    let items = [];
+    let currentIdx = 0;
+    let detailCache = {};
+    let counters = { saved: 0, skipped: 0 };
+
+    // 헤더 설정
+    const HEADER_KEY = 'tutorMemoHeader';
+    function getHeaderTemplate() {
+      return localStorage.getItem(HEADER_KEY) || '[운영팀 안내사항] 학생이 선택한 일정 중 가장 빠른 요일부터 실제 수업 가능하신 선생님만 수락해주세요./ 일정조율 불가합니다. /\n[학생 요청사항] ';
+    }
+    function openSettings() {
+      document.getElementById('header-template').value = getHeaderTemplate();
+      document.getElementById('settings-modal').style.display = 'flex';
+    }
+    function closeSettings() {
+      document.getElementById('settings-modal').style.display = 'none';
+    }
+    function saveSettings() {
+      localStorage.setItem(HEADER_KEY, document.getElementById('header-template').value);
+      closeSettings();
+    }
+
+    async function init() {
+      const badge = document.getElementById('type-badge');
+      badge.textContent = type === 'new' ? '신규매칭' : '재매칭';
+      badge.className = 'type-badge ' + (type === 'new' ? 'type-new' : 'type-rematch');
+
+      try {
+        const filterParam = new URLSearchParams(window.location.search).get('filter') || 'all';
+        const res = await fetch(`/api/userMemo/list?type=${type}&filter=${filterParam}`);
+        items = await res.json();
+      } catch { items = []; }
+
+      if (items.length === 0) {
+        showDone('처리할 항목이 없습니다');
+        return;
+      }
+
+      document.getElementById('loading-screen').style.display = 'none';
+      document.getElementById('edit-screen').style.display = '';
+      loadItem(0);
+    }
+
+    async function loadItem(idx) {
+      currentIdx = idx;
+      const item = items[idx];
+      if (!item) { showDone(); return; }
+
+      document.getElementById('counter').textContent = `${idx + 1} / ${items.length}`;
+      document.getElementById('btn-prev').disabled = idx === 0;
+      // 상단 정보 — 시트에서 일단 matchId, status만 표시
+      updateTopInfo(item, null);
+
+      // 수업신청서 + 가용시간은 detail 로딩 후 채움 (어드민 기반)
+      document.getElementById('form-grid').innerHTML = '<div style="color:#999">어드민 데이터 로딩 중...</div>';
+      document.getElementById('avail-grid').innerHTML = '';
+
+      // 초기화
+      document.getElementById('counsel-memo').textContent = '-';
+      document.getElementById('user-memo').textContent = '-';
+      document.getElementById('admin-tutor-memo').textContent = '-';
+      document.getElementById('request-area').innerHTML = '-';
+      document.getElementById('tutor-memo').value = getHeaderTemplate();
+
+      // 섹션 표시
+      document.getElementById('section-form').style.display = '';
+      document.getElementById('section-refs').style.display = 'none';
+      document.getElementById('section-edit').style.display = 'none';
+      document.getElementById('detail-loading').style.display = '';
+
+      // detail 가져오기 (캐시 있으면 재사용)
+      let detail = detailCache[item.matchId];
+      if (!detail) {
+        try {
+          const res = await fetch(`/api/userMemo/detail?matchId=${item.matchId}`);
+          detail = await res.json();
+          detailCache[item.matchId] = detail;
+        } catch (e) {
+          detail = { ok: false, message: e.message };
+        }
+      }
+
+      document.getElementById('detail-loading').style.display = 'none';
+      document.getElementById('section-refs').style.display = '';
+      document.getElementById('section-edit').style.display = '';
+
+      if (detail.ok === false && detail.message) {
+        document.getElementById('counsel-memo').textContent = '에러: ' + detail.message;
+        return;
+      }
+
+      // 시트 메모 (신규: 매칭담당자 메모 / 재매칭: memo)
+      const sheetMemoKey = type === 'new'
+        ? Object.keys(item.formData).find(k => /매칭담당자\s*메모/i.test(k.replace(/\n/g, '')))
+        : Object.keys(item.formData).find(k => /^memo$/i.test(k.trim()));
+      document.getElementById('sheet-memo').textContent = (sheetMemoKey ? item.formData[sheetMemoKey] : '') || '-';
+
+      document.getElementById('counsel-memo').textContent = detail.counselMemo || '-';
+      document.getElementById('user-memo').textContent = detail.userMemo || '-';
+      document.getElementById('admin-tutor-memo').textContent = detail.tutorMemo || '-';
+
+      // 상단 정보 어드민 데이터로 갱신
+      updateTopInfo(item, detail);
+
+      // 수업신청서 (어드민 __NEXT_DATA__ 기반 — 원래 필드 그대로)
+      const app = detail.applicant || {};
+      const prod = detail.product || {};
+      const ts = app.tutorStyles || {};
+      const isAbroad = app.livingAbroad === true;
+
+      // 한글 변환 매핑 (어드민 표시값 기준)
+      const UNIV_MAP = { HIGHEST: 'SKY', HIGHER: '서성한', HIGH: '중경외시', NORMAL: '건동홍숙', LOW: '국숭세단광명상', LOWEST: '그 외' };
+      const GENDER_MAP = { MALE: '남자', FEMALE: '여자' };
+      const PASS_MAP = { EARLY_DECISION: '수시', REGULAR_DECISION: '정시', OTHER: '기타' };
+      const TRACK_MAP = { LIBERAL_ARTS: '문과', NATURAL_SCIENCES: '이과' };
+      const STYLE_MAP = { WARM: '따뜻한 선생님', PASSIONATE: '열정적인 선생님', STRICT: '엄격한 선생님', FRIENDLY: '친근한 선생님', QUIET: '조용한 선생님', LEADING: '리더형 선생님' };
+      const mapArr = (arr, m) => (Array.isArray(arr) ? arr.map(v => m[v] || v).join(', ') : '');
+
+      const formEntries = [
+        { label: 'created_at_kst', value: detail.createdAt || '' },
+        { label: 'tutor_university_level', value: mapArr(ts.tutorUniversities, UNIV_MAP) },
+        { label: 'tutor_genders', value: mapArr(ts.tutorGenders, GENDER_MAP) },
+        { label: 'tutor_pass_types', value: mapArr(ts.tutorPassTypes, PASS_MAP) },
+        { label: 'tutor_tracks', value: mapArr(ts.tutorTracks, TRACK_MAP) },
+        { label: 'liked_tutor_styles', value: mapArr(ts.likedTutorStyles, STYLE_MAP) },
+        { label: 'living_abroad', value: isAbroad ? '해외 거주' : '', highlight: isAbroad },
+      ].filter(f => f.value);
+
+      const grid = document.getElementById('form-grid');
+      let formHtml = formEntries.map(f => {
+        const cls = f.highlight ? 'form-item highlight' : 'form-item';
+        return `<div class="${cls}"><div class="label">${f.label}</div><div class="value">${escHtml(String(f.value))}</div></div>`;
+      }).join('');
+      if (isAbroad) {
+        formHtml += `<div class="form-item highlight"><div class="label">카카오톡 ID</div><div class="value">${escHtml(detail.kakaoTalkId || '없음')}</div></div>`;
+      }
+      grid.innerHTML = formHtml || '<div style="color:#999">데이터 없음</div>';
+
+      // 가능 시간 블록 (어드민 weeklyAvailablePeriods)
+      const wap = app.weeklyAvailablePeriods || {};
+      const dayMap = [
+        ['monday', '월'], ['tuesday', '화'], ['wednesday', '수'], ['thursday', '목'],
+        ['friday', '금'], ['saturday', '토'], ['sunday', '일'],
+      ];
+      const availGrid = document.getElementById('avail-grid');
+      availGrid.innerHTML = dayMap.map(([key, label]) => {
+        const hours = (wap[key] || []).sort((a, b) => a - b);
+        if (hours.length === 0) return '';
+        return `<div class="avail-row"><span class="avail-day">${label}</span><span class="avail-hours">${hours.join(', ')}</span></div>`;
+      }).join('');
+
+      // Slack request
+      const reqArea = document.getElementById('request-area');
+      if (detail.request && detail.request.length > 0) {
+        reqArea.innerHTML = detail.request.map(m =>
+          `<div class="slack-msg">${escHtml(m.text)}<div class="meta"><span>${m.date}</span>${m.permalink ? `<a href="${m.permalink}" target="_blank">원본 보기</a>` : ''}</div></div>`
+        ).join('');
+      } else {
+        reqArea.innerHTML = '<div class="memo-content">매칭_요청 메시지 없음</div>';
+      }
+    }
+
+    function formatGender(val) {
+      if (!val) return '';
+      if (Array.isArray(val)) return val.map(v => v === 'FEMALE' ? '여자' : v === 'MALE' ? '남자' : v).join(', ');
+      return String(val).replace(/FEMALE/gi, '여자').replace(/MALE/gi, '남자').replace(/[\[\]"]/g, '').trim();
+    }
+
+    function updateTopInfo(item, detail) {
+      const mid = item.matchId;
+      const app = (detail && detail.applicant) || {};
+      const pp = (detail && detail.product) || {};
+
+      const uid = (detail && detail.userId) || '';
+      const uname = (detail && detail.userName) || '';
+      const lessonInfo = (detail && detail.lessonInfo) || '';
+      const rank = (app.rank || '').toString().toUpperCase();
+      const isPro = rank === 'EXPERT';
+
+      // 타입 뱃지
+      const badge = document.getElementById('type-badge');
+      const typeLabel = type === 'new' ? '신규' : '재매칭';
+      badge.textContent = isPro ? `PRO ${typeLabel}` : `일반 ${typeLabel}`;
+      badge.className = 'type-badge ' + (isPro ? 'type-pro' : (type === 'new' ? 'type-new' : 'type-rematch'));
+
+      // status 뱃지
+      const status = (item.status || '').trim();
+      let statusBadge = document.getElementById('status-badge');
+      if (!statusBadge) {
+        statusBadge = document.createElement('span');
+        statusBadge.id = 'status-badge';
+        badge.parentElement.insertBefore(statusBadge, badge.nextSibling);
+      }
+      const sn = status.replace(/\s+/g, '').toLowerCase();
+      statusBadge.textContent = status || '미처리';
+      let cls = 'status-other';
+      if (!status) cls = 'status-empty';
+      else if (/매칭완료|재매칭완료/.test(sn)) cls = 'status-done';
+      else if (/매칭중/.test(sn)) cls = 'status-matching';
+      else if (/확인필요/.test(sn)) cls = 'status-check';
+      else if (/보류/.test(sn)) cls = 'status-check';
+      else if (/첫수업전재매칭|일반재매칭/.test(sn)) cls = 'status-empty';
+      else if (/환불|소멸/.test(sn)) cls = 'status-other';
+      statusBadge.className = 'status-badge ' + cls;
+
+      // 정보 라인
+      const parts = [];
+      if (uid) parts.push(`<a href="https://tutor-admin.qanda.ai/admin/users/${uid}" target="_blank" style="color:#1976d2">${uid}</a>`);
+      if (uname) parts.push(uname);
+      const gradeCategory = (pp.gradeCategory || app.gradeCategory || '');
+      if (gradeCategory) parts.push(gradeCategory);
+      parts.push(`matchid <a href="https://tutor-admin.qanda.ai/admin/tutor-pairing?page=1&size=20&filters_matchId=${mid}" target="_blank" style="color:#1976d2">${mid}</a>`);
+      const oid = app.orderId || '';
+      if (oid) parts.push(`orderid <a href="https://tutor-admin.qanda.ai/admin/lessons/orders/${oid}" target="_blank" style="color:#1976d2">${oid}</a>`);
+      const subjectDetail = app.subjectDetail || '';
+      if (subjectDetail) parts.push(subjectDetail);
+      if (lessonInfo) parts.push(lessonInfo);
+
+      document.getElementById('info-line').innerHTML = parts.join(' / ');
+    }
+
+    function formatFieldValue(key, val) {
+      if (/^available_periods_/i.test(key) && val) {
+        const hours = val.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n)).sort((a,b) => a - b);
+        if (hours.length === 0) return escHtml(val);
+        return hours.join(', ');
+      }
+      if (key === 'tutor_genders') {
+        return val.replace(/FEMALE/gi, '여자').replace(/MALE/gi, '남자').replace(/[\[\]"]/g, '').trim();
+      }
+      if (key === 'living_abroad') {
+        return /^t(rue)?$/i.test(val.trim()) ? '해외 거주' : '국내';
+      }
+      return escHtml(val);
+    }
+
+    function escHtml(str) {
+      const d = document.createElement('div');
+      d.textContent = str || '';
+      return d.innerHTML;
+    }
+
+    function goPrev() { if (currentIdx > 0) loadItem(currentIdx - 1); }
+    function goNext() {
+      if (currentIdx < items.length - 1) loadItem(currentIdx + 1);
+      else showDone();
+    }
+    function goSkip() {
+      counters.skipped++;
+      if (currentIdx < items.length - 1) loadItem(currentIdx + 1);
+      else showDone();
+    }
+
+    async function aiEdit() {
+      const btn = document.getElementById('btn-ai');
+      btn.disabled = true; btn.textContent = 'AI 처리 중...';
+      try {
+        const item = items[currentIdx];
+        const detail = detailCache[item.matchId] || {};
+        const res = await fetch('/api/userMemo/ai-edit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            matchId: item.matchId, counselMemo: detail.counselMemo,
+            userMemo: detail.userMemo, request: detail.request, formData: item.formData,
+          }),
+        });
+        const data = await res.json();
+        if (data.ok) document.getElementById('tutor-memo').value = data.result;
+        else alert('AI 편집 실패: ' + (data.message || ''));
+      } catch (e) { alert('AI 편집 에러: ' + e.message); }
+      finally { btn.disabled = false; btn.textContent = 'AI 편집'; }
+    }
+
+    async function saveToAdmin() {
+      const btn = document.getElementById('btn-save');
+      btn.disabled = true; btn.textContent = '저장 중...';
+      try {
+        const item = items[currentIdx];
+        const res = await fetch('/api/userMemo/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type, matchId: item.matchId, rowNum: item.rowNum,
+            tutorMemo: document.getElementById('tutor-memo').value,
+          }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          counters.saved++;
+          if (currentIdx < items.length - 1) loadItem(currentIdx + 1);
+          else showDone();
+        } else alert('저장 실패: ' + (data.message || ''));
+      } catch (e) { alert('저장 에러: ' + e.message); }
+      finally { btn.disabled = false; btn.textContent = '어드민 저장'; }
+    }
+
+    function showDone(msg) {
+      document.getElementById('loading-screen').style.display = 'none';
+      document.getElementById('edit-screen').style.display = 'none';
+
+      // "전체" 모드 (autoNext=true)이고 신규 완료 시 → 재매칭으로 자동 이동
+      const autoNext = params.get('autoNext') === 'true';
+      if (autoNext && type === 'new') {
+        const filterParam = params.get('filter') || 'all';
+        window.location.href = `/userMemo.html?type=rematch&filter=${filterParam}&autoNext=true`;
+        return;
+      }
+
+      const ds = document.getElementById('done-screen');
+      ds.style.display = '';
+      if (msg) document.querySelector('#done-screen .msg').textContent = msg;
+      document.getElementById('done-summary').textContent = `저장 ${counters.saved}건, 건너뛰기 ${counters.skipped}건`;
+    }
+
+    init();
+  </script>
+</body>
+</html>
