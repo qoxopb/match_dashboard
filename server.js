@@ -621,15 +621,42 @@ app.post('/api/userMemo/save', async (req, res) => {
   }
 });
 
-// --- 배포 (git pull + 재시작) ---
+// --- 버전 & 배포 ---
 const { execSync } = require('child_process');
+
+function getCurrentVersion() {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(__dirname, 'version.json'), 'utf-8')).version;
+  } catch { return '?'; }
+}
+
+app.get('/api/version', (req, res) => {
+  res.json({ version: getCurrentVersion() });
+});
+
+app.get('/api/version/latest', async (req, res) => {
+  try {
+    const https = require('https');
+    const url = 'https://raw.githubusercontent.com/qoxopb/match_dashboard/main/version.json';
+    const data = await new Promise((resolve, reject) => {
+      https.get(url, r => {
+        let body = '';
+        r.on('data', c => body += c);
+        r.on('end', () => resolve(body));
+      }).on('error', reject);
+    });
+    const latest = JSON.parse(data).version;
+    res.json({ version: latest, current: getCurrentVersion(), updateAvailable: latest !== getCurrentVersion() });
+  } catch (e) {
+    res.json({ version: '?', current: getCurrentVersion(), updateAvailable: false, error: e.message });
+  }
+});
 
 app.post('/api/deploy', (req, res) => {
   try {
     const output = execSync('git pull', { cwd: __dirname, encoding: 'utf-8', timeout: 30000 });
     addLog(`[deploy] git pull: ${output.trim()}`);
     res.json({ ok: true, message: output.trim() });
-    // 1초 후 프로세스 종료 → pm2가 자동 재시작
     setTimeout(() => process.exit(0), 1000);
   } catch (e) {
     res.json({ ok: false, message: e.message });

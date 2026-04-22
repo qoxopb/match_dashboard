@@ -319,7 +319,11 @@
         <li data-view="dashboard" onclick="switchView('dashboard')">대시보드</li>
       </ul>
       <div style="position:absolute;bottom:20px;left:0;right:0;padding:0 20px;">
-        <button onclick="deploy()" style="width:100%;padding:8px;background:#455a64;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;">코드 업데이트</button>
+        <div style="font-size:11px;color:#888;margin-bottom:8px;">
+          <div>현재: <span id="ver-current" style="color:#fff;">-</span></div>
+          <div>최신: <span id="ver-latest" style="color:#fff;">-</span> <span id="ver-badge"></span></div>
+        </div>
+        <button id="deploy-btn" onclick="deploy()" style="width:100%;padding:8px;background:#455a64;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;display:none;">업데이트</button>
         <div id="deploy-msg" style="font-size:11px;color:#aaa;margin-top:6px;text-align:center;"></div>
       </div>
     </aside>
@@ -1220,7 +1224,25 @@
       window.open(`/userMemo.html?type=new${filterParam}&autoNext=true`, '_blank');
     }
 
-    // --- 코드 업데이트 (git pull + 재시작) ---
+    // --- 버전 체크 & 업데이트 ---
+    async function checkVersion() {
+      try {
+        const res = await fetch('/api/version/latest');
+        const data = await res.json();
+        document.getElementById('ver-current').textContent = 'v' + data.current;
+        document.getElementById('ver-latest').textContent = 'v' + data.version;
+        const badge = document.getElementById('ver-badge');
+        const btn = document.getElementById('deploy-btn');
+        if (data.updateAvailable) {
+          badge.innerHTML = '<span style="background:#e53935;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px;">NEW</span>';
+          btn.style.display = 'block';
+        } else {
+          badge.innerHTML = '<span style="color:#69db7c;font-size:10px;">최신</span>';
+          btn.style.display = 'none';
+        }
+      } catch {}
+    }
+
     async function deploy() {
       if (!confirm('서버 코드를 최신으로 업데이트합니다. 서버가 잠시 재시작됩니다.')) return;
       const msg = document.getElementById('deploy-msg');
@@ -1238,6 +1260,9 @@
         setTimeout(() => location.reload(), 5000);
       }
     }
+
+    checkVersion();
+    setInterval(checkVersion, 60000);
 
     // 초기화
     initScheduleSections();
