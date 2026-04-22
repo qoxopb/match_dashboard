@@ -504,7 +504,13 @@
       return d.innerHTML;
     }
 
-    function goPrev() { if (currentIdx > 0) loadItem(currentIdx - 1); }
+    function goPrev() {
+      if (currentIdx > 0) {
+        document.getElementById('done-screen').style.display = 'none';
+        document.getElementById('edit-screen').style.display = '';
+        loadItem(currentIdx - 1);
+      }
+    }
     function goNext() {
       if (currentIdx < items.length - 1) loadItem(currentIdx + 1);
       else showDone();
