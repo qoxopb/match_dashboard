@@ -6,7 +6,7 @@ let context = null;
 async function connect() {
   if (browser && browser.isConnected()) return context;
 
-  browser = await chromium.connectOverCDP('http://localhost:9222');
+  browser = await chromium.connectOverCDP('http://127.0.0.1:9222');
   context = browser.contexts()[0];
 
   if (!context) {
