@@ -180,7 +180,7 @@
     .wf-btn-del { background: #e53935; color: #fff; }
 
     .wf-area {
-      display: grid; grid-template-columns: 240px 1fr 220px; gap: 16px;
+      display: grid; grid-template-columns: 240px 1fr; gap: 16px;
     }
     .wf-presets {
       background: #fff; border-radius: 10px; padding: 16px;
@@ -468,15 +468,26 @@
       <!-- 워크플로우 -->
       <section class="view" id="view-workflow">
         <h1>워크플로우</h1>
-        <div class="wf-toolbar">
-          <input class="wf-rename" id="wf-preset-name" placeholder="프리셋 이름" />
-          <button class="wf-btn wf-btn-save" onclick="savePreset()">저장</button>
-          <button class="wf-btn wf-btn-clear" onclick="clearWorkspace()">초기화</button>
-          <button class="wf-btn wf-btn-run" onclick="runWorkflow()" style="margin-left:auto;">▶ 실행</button>
+
+        <!-- 상단: 설정 바 + 프리셋 목록 (50/50) -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+          <div class="wf-toolbar" style="margin-bottom:0;flex-direction:column;align-items:stretch;gap:10px;">
+            <input class="wf-rename" id="wf-preset-name" placeholder="프리셋 이름" style="width:100%;" />
+            <div style="display:flex;gap:8px;">
+              <button class="wf-btn wf-btn-save" onclick="savePreset()">저장</button>
+              <button class="wf-btn wf-btn-clear" onclick="clearWorkspace()">초기화</button>
+              <button class="wf-btn wf-btn-run" onclick="runWorkflow()" style="margin-left:auto;">▶ 실행</button>
+            </div>
+          </div>
+          <div class="wf-presets" style="max-height:200px;">
+            <div class="wf-section-title">프리셋</div>
+            <div id="wf-preset-list"></div>
+            <button class="wf-add-preset" onclick="addPreset()">+ 새 프리셋</button>
+          </div>
         </div>
 
-        <div class="wf-area">
-          <!-- 블럭 팔레트 -->
+        <!-- 하단: 팔레트 + 워크스페이스 (2열) -->
+        <div class="wf-area" style="grid-template-columns:240px 1fr;">
           <div class="wf-palette">
             <div class="wf-section-title">시트 정리</div>
             <div class="wf-block cat-prep" draggable="true" ondragstart="dragStart(event,'prep:new','신규 시트 정리','prep')" onclick="addBlock('prep:new','신규 시트 정리','prep')">신규 시트 정리</div>
@@ -504,19 +515,11 @@
             <div class="wf-block cat-control" onclick="addCondLoop()">조건 반복</div>
           </div>
 
-          <!-- 워크스페이스 -->
           <div class="wf-workspace">
             <div class="wf-workspace-list" id="wf-ws-list"
                  ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="dropOnWorkspace(event)">
               <div class="wf-empty-msg">왼쪽 블럭을 드래그하거나 클릭하면 여기에 추가됩니다</div>
             </div>
-          </div>
-
-          <!-- 프리셋 목록 -->
-          <div class="wf-presets">
-            <div class="wf-section-title">프리셋</div>
-            <div id="wf-preset-list"></div>
-            <button class="wf-add-preset" onclick="addPreset()">+ 새 프리셋</button>
           </div>
         </div>
       </section>
