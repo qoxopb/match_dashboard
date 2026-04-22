@@ -634,6 +634,13 @@ app.get('/api/version', (req, res) => {
   res.json({ version: getCurrentVersion() });
 });
 
+app.get('/api/changelog', (req, res) => {
+  try {
+    const log = JSON.parse(fs.readFileSync(path.join(__dirname, 'changelog.json'), 'utf-8'));
+    res.json(log);
+  } catch { res.json([]); }
+});
+
 app.get('/api/version/latest', (req, res) => {
   try {
     execSync('git fetch', { cwd: __dirname, encoding: 'utf-8', timeout: 15000 });

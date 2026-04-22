@@ -319,7 +319,7 @@
         <li data-view="dashboard" onclick="switchView('dashboard')">대시보드</li>
       </ul>
       <div style="position:absolute;bottom:20px;left:0;right:0;padding:0 20px;">
-        <div style="font-size:11px;color:#888;margin-bottom:8px;">
+        <div style="font-size:11px;color:#888;margin-bottom:8px;cursor:pointer;" onclick="openChangelog()">
           <div>현재: <span id="ver-current" style="color:#fff;">-</span></div>
           <div>최신: <span id="ver-latest" style="color:#fff;">-</span> <span id="ver-badge"></span></div>
         </div>
@@ -1263,6 +1263,56 @@
 
     checkVersion();
     setInterval(checkVersion, 60000);
+
+    // --- 변경 이력 모달 ---
+    async function openChangelog() {
+      let modal = document.getElementById('changelog-modal');
+      if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'changelog-modal';
+        document.body.appendChild(modal);
+      }
+      modal.innerHTML = `
+        <div style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:999;display:flex;align-items:center;justify-content:center;" onclick="if(event.target===this)this.parentElement.style.display='none'">
+          <div style="background:#fff;border-radius:10px;padding:24px;width:520px;max-height:80vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.2);">
+            <h3 style="margin:0 0 16px;font-size:16px;">변경 이력</h3>
+            <div id="changelog-list" style="color:#999;font-size:13px;">불러오는 중...</div>
+          </div>
+        </div>`;
+      modal.style.display = 'block';
+
+      try {
+        const res = await fetch('/api/changelog');
+        const logs = await res.json();
+        const currentVer = document.getElementById('ver-current').textContent.replace('v','');
+        const list = document.getElementById('changelog-list');
+        if (logs.length === 0) { list.textContent = '이력 없음'; return; }
+        list.innerHTML = `
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+              <tr style="border-bottom:2px solid #e0e0e0;text-align:left;">
+                <th style="padding:8px 6px;color:#999;font-weight:600;white-space:nowrap;">TS</th>
+                <th style="padding:8px 6px;color:#999;font-weight:600;white-space:nowrap;">버전</th>
+                <th style="padding:8px 6px;color:#999;font-weight:600;">수정사항</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${logs.map(l => {
+                const isCurrent = l.version === currentVer;
+                const rowStyle = isCurrent ? 'background:#e3f2fd;' : '';
+                const verBadge = isCurrent ? ' <span style="background:#1976d2;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px;">현재</span>' : '';
+                return `<tr style="border-bottom:1px solid #f0f0f0;${rowStyle}">
+                  <td style="padding:8px 6px;white-space:nowrap;color:#999;font-family:monospace;">${l.ts}</td>
+                  <td style="padding:8px 6px;white-space:nowrap;font-weight:600;">v${l.version}${verBadge}</td>
+                  <td style="padding:8px 6px;line-height:1.6;">${l.changes.map(c => '- ' + c).join('<br>')}</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>`;
+      } catch (e) {
+        document.getElementById('changelog-list').textContent = '에러: ' + e.message;
+      }
+    }
 
     // 초기화
     initScheduleSections();
