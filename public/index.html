@@ -318,6 +318,10 @@
         <li data-view="status" onclick="switchView('status')">당일 현황</li>
         <li data-view="dashboard" onclick="switchView('dashboard')">대시보드</li>
       </ul>
+      <div style="position:absolute;bottom:20px;left:0;right:0;padding:0 20px;">
+        <button onclick="deploy()" style="width:100%;padding:8px;background:#455a64;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;">코드 업데이트</button>
+        <div id="deploy-msg" style="font-size:11px;color:#aaa;margin-top:6px;text-align:center;"></div>
+      </div>
     </aside>
 
     <main class="main">
@@ -1214,6 +1218,25 @@
     function openMemoAll() {
       const filterParam = memoFilter === 'initial' ? '&filter=initial' : '';
       window.open(`/userMemo.html?type=new${filterParam}&autoNext=true`, '_blank');
+    }
+
+    // --- 코드 업데이트 (git pull + 재시작) ---
+    async function deploy() {
+      if (!confirm('서버 코드를 최신으로 업데이트합니다. 서버가 잠시 재시작됩니다.')) return;
+      const msg = document.getElementById('deploy-msg');
+      msg.textContent = '업데이트 중...';
+      try {
+        const res = await fetch('/api/deploy', { method: 'POST' });
+        const data = await res.json();
+        msg.textContent = data.message || '완료';
+        if (data.ok) {
+          msg.textContent = '재시작 중... 5초 후 새로고침';
+          setTimeout(() => location.reload(), 5000);
+        }
+      } catch (e) {
+        msg.textContent = '연결 끊김 — 재시작 중...';
+        setTimeout(() => location.reload(), 5000);
+      }
     }
 
     // 초기화

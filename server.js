@@ -621,6 +621,21 @@ app.post('/api/userMemo/save', async (req, res) => {
   }
 });
 
+// --- 배포 (git pull + 재시작) ---
+const { execSync } = require('child_process');
+
+app.post('/api/deploy', (req, res) => {
+  try {
+    const output = execSync('git pull', { cwd: __dirname, encoding: 'utf-8', timeout: 30000 });
+    addLog(`[deploy] git pull: ${output.trim()}`);
+    res.json({ ok: true, message: output.trim() });
+    // 1초 후 프로세스 종료 → pm2가 자동 재시작
+    setTimeout(() => process.exit(0), 1000);
+  } catch (e) {
+    res.json({ ok: false, message: e.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`서버 시작: http://localhost:${PORT}`);
 });
