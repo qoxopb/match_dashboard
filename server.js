@@ -634,18 +634,11 @@ app.get('/api/version', (req, res) => {
   res.json({ version: getCurrentVersion() });
 });
 
-app.get('/api/version/latest', async (req, res) => {
+app.get('/api/version/latest', (req, res) => {
   try {
-    const https = require('https');
-    const url = 'https://raw.githubusercontent.com/qoxopb/match_dashboard/main/version.json';
-    const data = await new Promise((resolve, reject) => {
-      https.get(url, r => {
-        let body = '';
-        r.on('data', c => body += c);
-        r.on('end', () => resolve(body));
-      }).on('error', reject);
-    });
-    const latest = JSON.parse(data).version;
+    execSync('git fetch', { cwd: __dirname, encoding: 'utf-8', timeout: 15000 });
+    const remote = execSync('git show origin/main:version.json', { cwd: __dirname, encoding: 'utf-8', timeout: 5000 });
+    const latest = JSON.parse(remote).version;
     res.json({ version: latest, current: getCurrentVersion(), updateAvailable: latest !== getCurrentVersion() });
   } catch (e) {
     res.json({ version: '?', current: getCurrentVersion(), updateAvailable: false, error: e.message });
