@@ -1,5 +1,10 @@
 [
   {
+    "version": "1.2.0",
+    "ts": "2604221620",
+    "changes": ["파일 로그 추가 (logs/YYMMDD.log)", "메모리 로그 버퍼 500→2000줄 확장", "로그 파일 조회 API (/api/logs/file, /api/logs/files)"]
+  },
+  {
     "version": "1.1.2",
     "ts": "2604221603",
     "changes": ["변경 이력 TS를 한국 시간(KST) 기준으로 수정"]

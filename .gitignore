@@ -4,5 +4,6 @@ oauth-client.json
 oauth-token.json
 config.json
 *.log
+logs/
 .DS_Store
 Thumbs.db

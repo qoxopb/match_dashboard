@@ -1,6 +1,7 @@
 const express = require('express');
 const cron = require('node-cron');
 const path = require('path');
+const fs = require('fs');
 const notifier = require('node-notifier');
 const config = require('./config.json');
 const { prepNewSheet, prepRematchSheet, createMonthlyTab } = require('./automation/sheetPrep');
@@ -21,15 +22,28 @@ const { shouldAbort, requestAbort, resetAbort } = require('./abort');
 const logs = [];
 let running = null;
 
+// 파일 로그 — logs/ 폴더에 날짜별 저장
+const logsDir = path.join(__dirname, 'logs');
+if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir);
+
+function getLogFileName() {
+  const now = new Date();
+  const yy = String(now.getFullYear()).slice(2);
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  return path.join(logsDir, `${yy}${mm}${dd}.log`);
+}
+
 function addLog(msg) {
   const time = new Date().toLocaleTimeString('ko-KR');
   logs.push({ time, msg });
-  if (logs.length > 500) logs.shift();
+  if (logs.length > 2000) logs.shift();
+  // 파일에도 기록
+  try { fs.appendFileSync(getLogFileName(), `[${time}] ${msg}\n`); } catch {}
 }
 
 const origLog = console.log;
 const origError = console.error;
-// 로그는 메모리에만 저장하고 터미널엔 출력하지 않음 (대시보드 UI에서 확인)
 console.log = (...args) => { addLog(args.join(' ')); };
 console.error = (...args) => { addLog('[ERROR] ' + args.join(' ')); };
 
@@ -186,6 +200,31 @@ app.get('/api/schedules', (req, res) => {
 // 로그 + 상태
 app.get('/api/logs', (req, res) => {
   res.json({ running, logs: logs.map(l => `[${l.time}] ${l.msg}`) });
+});
+
+// 파일 로그 조회 (날짜별, ?date=260422 또는 기본 오늘)
+app.get('/api/logs/file', (req, res) => {
+  try {
+    const date = req.query.date || (() => {
+      const now = new Date();
+      return String(now.getFullYear()).slice(2) + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
+    })();
+    const filePath = path.join(logsDir, `${date}.log`);
+    if (!fs.existsSync(filePath)) return res.json({ date, lines: [] });
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const lines = content.split('\n').filter(l => l.trim());
+    res.json({ date, total: lines.length, lines });
+  } catch (e) {
+    res.json({ error: e.message });
+  }
+});
+
+// 로그 파일 목록
+app.get('/api/logs/files', (req, res) => {
+  try {
+    const files = fs.readdirSync(logsDir).filter(f => f.endsWith('.log')).sort().reverse();
+    res.json(files);
+  } catch (e) { res.json([]); }
 });
 
 app.get('/api/status', (req, res) => {
@@ -493,7 +532,6 @@ app.post('/api/stop', (req, res) => {
 });
 
 // --- AIM 키워드 설정 API ---
-const fs = require('fs');
 const configPath = path.join(__dirname, 'config.json');
 
 function saveConfig() {
