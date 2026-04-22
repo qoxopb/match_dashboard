@@ -1301,8 +1301,9 @@
                 const isCurrent = l.version === currentVer;
                 const rowStyle = isCurrent ? 'background:#e3f2fd;' : '';
                 const verBadge = isCurrent ? ' <span style="background:#1976d2;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px;">현재</span>' : '';
+                const tsDisplay = l.ts.length === 10 ? l.ts.replace(/^(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/, '$1.$2.$3 $4:$5') : l.ts;
                 return `<tr style="border-bottom:1px solid #f0f0f0;${rowStyle}">
-                  <td style="padding:8px 6px;white-space:nowrap;color:#999;font-family:monospace;">${l.ts}</td>
+                  <td style="padding:8px 6px;white-space:nowrap;color:#999;font-family:monospace;">${tsDisplay}</td>
                   <td style="padding:8px 6px;white-space:nowrap;font-weight:600;">v${l.version}${verBadge}</td>
                   <td style="padding:8px 6px;line-height:1.6;">${l.changes.map(c => '- ' + c).join('<br>')}</td>
                 </tr>`;
