@@ -1,8 +1,8 @@
 [
   {
-    "version": "1.4.1",
-    "ts": "2604231100",
-    "changes": ["매칭제안 전송하기 클릭 3단계 fallback (mouse.click → evaluate click → dispatchEvent)", "전송하기 클�� 좌표 디버그 로그 추가"]
+    "version": "1.4.2",
+    "ts": "2604231115",
+    "changes": ["매칭제안: 타임라인 모달이 전송하기를 가리는 문제 수정", "전송하기 3단계 fallback + 디버그 로그 추가"]
   },
   {
     "version": "1.4.0",
