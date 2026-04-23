@@ -207,4 +207,4 @@ async function runStatusCheck(mode) {
   }
 }
 
-module.exports = { runStatusCheck };
+module.exports = { runStatusCheck, runStatusCheckForType };

@@ -6,7 +6,7 @@ const notifier = require('node-notifier');
 const config = require('./config.json');
 const { prepNewSheet, prepRematchSheet, createMonthlyTab } = require('./automation/sheetPrep');
 const { runPairing } = require('./automation/pairing');
-const { runStatusCheck } = require('./automation/statusCheck');
+const { runStatusCheck, runStatusCheckForType } = require('./automation/statusCheck');
 const { runAim } = require('./automation/aim');
 const { disconnect } = require('./automation/browser');
 
@@ -571,6 +571,19 @@ function getUserMemoTabName(type) {
   const mm = String(now.getMonth() + 1).padStart(2, '0');
   return type === 'new' ? `[신규] ${yy}.${mm}` : `[재매칭] ${yy}.${mm}`;
 }
+
+// 유저메모 진입 전 상태 동기화 (statusCheck 실행)
+app.get('/api/userMemo/sync', async (req, res) => {
+  try {
+    const type = req.query.type || 'new';
+    console.log(`[userMemo] ${type === 'new' ? '신규' : '재매칭'} 상태 동기화 시작`);
+    await runStatusCheckForType(type);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('[userMemo] sync 에러:', e.message);
+    res.json({ ok: false, message: e.message });
+  }
+});
 
 // 목록 조회 (status 공란인 건만)
 app.get('/api/userMemo/list', async (req, res) => {

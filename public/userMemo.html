@@ -290,6 +290,12 @@
       badge.className = 'type-badge ' + (type === 'new' ? 'type-new' : 'type-rematch');
 
       try {
+        // 1단계: 어드민 상태 동기화 (statusCheck)
+        document.querySelector('#loading-screen span').textContent = '매칭결과 확인 중...';
+        await fetch(`/api/userMemo/sync?type=${type}`);
+
+        // 2단계: 목록 조회
+        document.querySelector('#loading-screen span').textContent = '목록 불러오는 중...';
         const filterParam = new URLSearchParams(window.location.search).get('filter') || 'all';
         const res = await fetch(`/api/userMemo/list?type=${type}&filter=${filterParam}`);
         items = await res.json();
