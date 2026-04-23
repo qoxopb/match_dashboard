@@ -314,7 +314,7 @@
       <div class="sidebar-brand">콴다과외 매칭</div>
       <ul class="sidebar-menu">
         <li class="active" data-view="features" onclick="switchView('features')">기능</li>
-        <li data-view="workflow" onclick="switchView('workflow')">워크플로우</li>
+        <li data-view="workflow" onclick="switchView('workflow')">워크플로</li>
         <li data-view="status" onclick="switchView('status')">당일 현황</li>
         <li data-view="dashboard" onclick="switchView('dashboard')">대시보드</li>
       </ul>
@@ -465,61 +465,64 @@
         </div>
       </section>
 
-      <!-- 워크플로우 -->
+      <!-- 워크플로 -->
       <section class="view" id="view-workflow">
-        <h1>워크플로우</h1>
+        <h1>워크플로</h1>
 
-        <!-- 상단: 설정 바 + 프리셋 목록 (50/50) -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
-          <div class="wf-toolbar" style="margin-bottom:0;flex-direction:column;align-items:stretch;gap:10px;">
-            <input class="wf-rename" id="wf-preset-name" placeholder="프리셋 이름" style="width:100%;" />
-            <div style="display:flex;gap:8px;">
+        <div style="display:grid;grid-template-columns:1fr 280px;gap:16px;">
+          <!-- 왼쪽: 설정 바 + 팔레트 + 워크스페이스 -->
+          <div>
+            <!-- 설정 바 -->
+            <div class="wf-toolbar" style="margin-bottom:16px;">
+              <input class="wf-rename" id="wf-preset-name" placeholder="프리셋 이름" style="flex:1;" />
               <button class="wf-btn wf-btn-save" onclick="savePreset()">저장</button>
               <button class="wf-btn wf-btn-clear" onclick="clearWorkspace()">초기화</button>
-              <button class="wf-btn wf-btn-run" onclick="runWorkflow()" style="margin-left:auto;">▶ 실행</button>
+              <button class="wf-btn wf-btn-run" onclick="runWorkflow()">&#9654; 실행</button>
+            </div>
+
+            <!-- 팔레트 + 워크스페이스 -->
+            <div class="wf-area" style="grid-template-columns:240px 1fr;">
+              <div class="wf-palette">
+                <div class="wf-section-title">시트 정리</div>
+                <div class="wf-block cat-prep" draggable="true" ondragstart="dragStart(event,'prep:new','신규 시트 정리','prep')" onclick="addBlock('prep:new','신규 시트 정리','prep')">신규 시트 정리</div>
+                <div class="wf-block cat-prep" draggable="true" ondragstart="dragStart(event,'prep:rematch','재매칭 시트 정리','prep')" onclick="addBlock('prep:rematch','재매칭 시트 정리','prep')">재매칭 시트 정리</div>
+                <div class="wf-block cat-prep" draggable="true" ondragstart="dragStart(event,'prep','전체 시트 정리','prep')" onclick="addBlock('prep','전체 시트 정리','prep')">전체 시트 정리</div>
+
+                <div class="wf-section-title">페어링</div>
+                <div class="wf-block cat-pairing" draggable="true" ondragstart="dragStart(event,'pairing','페어링 생성','pairing')" onclick="addBlock('pairing','페어링 생성','pairing')">페어링 생성</div>
+
+                <div class="wf-section-title">매칭 제안 (AIM)</div>
+                <div class="wf-block cat-aim" draggable="true" ondragstart="dragStart(event,'aim:new','신규 매칭 제안','aim')" onclick="addBlock('aim:new','신규 매칭 제안','aim')">신규 매칭 제안</div>
+                <div class="wf-block cat-aim" draggable="true" ondragstart="dragStart(event,'aim:rematch','재매칭 제안','aim')" onclick="addBlock('aim:rematch','재매칭 제안','aim')">재매칭 제안</div>
+                <div class="wf-block cat-aim" draggable="true" ondragstart="dragStart(event,'aim','전체 매칭 제안','aim')" onclick="addBlock('aim','전체 매칭 제안','aim')">전체 매칭 제안</div>
+
+                <div class="wf-section-title">매칭결과 확인</div>
+                <div class="wf-block cat-status" draggable="true" ondragstart="dragStart(event,'statusCheck:new','신규 매칭결과 확인','status')" onclick="addBlock('statusCheck:new','신규 매칭결과 확인','status')">신규 매칭결과 확인</div>
+                <div class="wf-block cat-status" draggable="true" ondragstart="dragStart(event,'statusCheck:rematch','재매칭 결과 확인','status')" onclick="addBlock('statusCheck:rematch','재매칭 결과 확인','status')">재매칭 결과 확인</div>
+                <div class="wf-block cat-status" draggable="true" ondragstart="dragStart(event,'statusCheck','전체 매칭결과 확인','status')" onclick="addBlock('statusCheck','전체 매칭결과 확인','status')">전체 매칭결과 확인</div>
+
+                <div class="wf-section-title">월별 관리</div>
+                <div class="wf-block cat-monthly" draggable="true" ondragstart="dragStart(event,'monthly','월별 탭 생성','monthly')" onclick="addBlock('monthly','월별 탭 생성','monthly')">월별 탭 생성</div>
+
+                <div class="wf-section-title">제어</div>
+                <div class="wf-block cat-control" onclick="addLoop()">반복 N회</div>
+                <div class="wf-block cat-control" onclick="addCondLoop()">조건 반복</div>
+              </div>
+
+              <div class="wf-workspace">
+                <div class="wf-workspace-list" id="wf-ws-list"
+                     ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="dropOnWorkspace(event)">
+                  <div class="wf-empty-msg">왼쪽 블럭을 드래그하거나 클릭하면 여기에 추가됩니다</div>
+                </div>
+              </div>
             </div>
           </div>
-          <div class="wf-presets" style="max-height:200px;">
+
+          <!-- 오른쪽: 프리셋 목록 -->
+          <div class="wf-presets" style="max-height:calc(100vh - 120px);align-self:start;">
             <div class="wf-section-title">프리셋</div>
             <div id="wf-preset-list"></div>
             <button class="wf-add-preset" onclick="addPreset()">+ 새 프리셋</button>
-          </div>
-        </div>
-
-        <!-- 하단: 팔레트 + 워크스페이스 (2열) -->
-        <div class="wf-area" style="grid-template-columns:240px 1fr;">
-          <div class="wf-palette">
-            <div class="wf-section-title">시트 정리</div>
-            <div class="wf-block cat-prep" draggable="true" ondragstart="dragStart(event,'prep:new','신규 시트 정리','prep')" onclick="addBlock('prep:new','신규 시트 정리','prep')">신규 시트 정리</div>
-            <div class="wf-block cat-prep" draggable="true" ondragstart="dragStart(event,'prep:rematch','재매칭 시트 정리','prep')" onclick="addBlock('prep:rematch','재매칭 시트 정리','prep')">재매칭 시트 정리</div>
-            <div class="wf-block cat-prep" draggable="true" ondragstart="dragStart(event,'prep','전체 시트 정리','prep')" onclick="addBlock('prep','전체 시트 정리','prep')">전체 시트 정리</div>
-
-            <div class="wf-section-title">페어링</div>
-            <div class="wf-block cat-pairing" draggable="true" ondragstart="dragStart(event,'pairing','페어링 생성','pairing')" onclick="addBlock('pairing','페어링 생성','pairing')">페어링 생성</div>
-
-            <div class="wf-section-title">매칭 제안 (AIM)</div>
-            <div class="wf-block cat-aim" draggable="true" ondragstart="dragStart(event,'aim:new','신규 매칭 제안','aim')" onclick="addBlock('aim:new','신규 매칭 제안','aim')">신규 매칭 제안</div>
-            <div class="wf-block cat-aim" draggable="true" ondragstart="dragStart(event,'aim:rematch','재매칭 제안','aim')" onclick="addBlock('aim:rematch','재매칭 제안','aim')">재매칭 제안</div>
-            <div class="wf-block cat-aim" draggable="true" ondragstart="dragStart(event,'aim','전체 매칭 제안','aim')" onclick="addBlock('aim','전체 매칭 제안','aim')">전체 매칭 제안</div>
-
-            <div class="wf-section-title">매칭결과 확인</div>
-            <div class="wf-block cat-status" draggable="true" ondragstart="dragStart(event,'statusCheck:new','신규 매칭결과 확인','status')" onclick="addBlock('statusCheck:new','신규 매칭결과 확인','status')">신규 매칭결과 확인</div>
-            <div class="wf-block cat-status" draggable="true" ondragstart="dragStart(event,'statusCheck:rematch','재매칭 결과 확인','status')" onclick="addBlock('statusCheck:rematch','재매칭 결과 확인','status')">재매칭 결과 확인</div>
-            <div class="wf-block cat-status" draggable="true" ondragstart="dragStart(event,'statusCheck','전체 매칭결과 확인','status')" onclick="addBlock('statusCheck','전체 매칭결과 확인','status')">전체 매칭결과 확인</div>
-
-            <div class="wf-section-title">월별 관리</div>
-            <div class="wf-block cat-monthly" draggable="true" ondragstart="dragStart(event,'monthly','월별 탭 생성','monthly')" onclick="addBlock('monthly','월별 탭 생성','monthly')">월별 탭 생성</div>
-
-            <div class="wf-section-title">제어</div>
-            <div class="wf-block cat-control" onclick="addLoop()">반복 N회</div>
-            <div class="wf-block cat-control" onclick="addCondLoop()">조건 반복</div>
-          </div>
-
-          <div class="wf-workspace">
-            <div class="wf-workspace-list" id="wf-ws-list"
-                 ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="dropOnWorkspace(event)">
-              <div class="wf-empty-msg">왼쪽 블럭을 드래그하거나 클릭하면 여기에 추가됩니다</div>
-            </div>
           </div>
         </div>
       </section>
