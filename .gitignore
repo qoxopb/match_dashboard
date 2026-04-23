@@ -3,6 +3,7 @@ credentials.json
 oauth-client.json
 oauth-token.json
 config.json
+wf-presets.json
 *.log
 logs/
 .DS_Store

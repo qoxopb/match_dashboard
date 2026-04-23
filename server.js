@@ -714,6 +714,107 @@ app.post('/api/deploy', (req, res) => {
   }
 });
 
+// --- 워크플로 프리셋 서버 저장 & 실행 ---
+const wfPresetsPath = path.join(__dirname, 'wf-presets.json');
+let wfPresetsData = {};
+try { wfPresetsData = JSON.parse(fs.readFileSync(wfPresetsPath, 'utf-8')); } catch {}
+
+function saveWfPresets() {
+  fs.writeFileSync(wfPresetsPath, JSON.stringify(wfPresetsData, null, 2), 'utf-8');
+}
+
+async function runWfBlocks(blocks) {
+  for (const b of blocks) {
+    if (shouldAbort()) return;
+    if (b.kind === 'job') {
+      const job = JOBS[b.jobId];
+      if (job) {
+        console.log(`[워크플로] ${b.label || b.jobId} 실행`);
+        await job.fn();
+      }
+    } else if (b.kind === 'loop') {
+      for (let r = 0; r < (b.count || 1); r++) {
+        if (shouldAbort()) return;
+        console.log(`[워크플로] 반복 ${r + 1}/${b.count}`);
+        await runWfBlocks(b.children || []);
+      }
+    } else if (b.kind === 'condLoop') {
+      for (let r = 0; r < (b.maxIter || 5); r++) {
+        if (shouldAbort()) return;
+        const met = await checkWfCondition(b);
+        if (met) { console.log(`[워크플로] 조건 만족 — ${r}회차에 종료`); break; }
+        console.log(`[워크플로] 조건 반복 ${r + 1}/${b.maxIter}`);
+        await runWfBlocks(b.children || []);
+      }
+    }
+  }
+}
+
+async function checkWfCondition(cond) {
+  try {
+    const type = cond.condType || 'new';
+    const sheets = await getSheetsApi();
+    const spreadsheetId = config.sheets[type === 'new' ? 'new' : 'rematch'];
+    const now = new Date();
+    const yy = String(now.getFullYear()).slice(2);
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const tabName = type === 'new' ? `[신규] ${yy}.${mm}` : `[재매칭] ${yy}.${mm}`;
+    const headerRes = await sheets.spreadsheets.values.get({ spreadsheetId, range: `'${tabName}'!A1:BZ1` });
+    const header = (headerRes.data.values || [])[0] || [];
+    const norm = s => (s || '').replace(/\s+/g, '').toLowerCase();
+    const matchIdIdx = header.findIndex(h => norm(h) === norm(type === 'new' ? 'match_id' : 'match ID'));
+    const statusIdx = header.findIndex(h => norm(h) === norm(type === 'new' ? '매칭상태' : 'status'));
+    const dataRes = await sheets.spreadsheets.values.get({ spreadsheetId, range: `'${tabName}'!A2:BZ` });
+    const rows = dataRes.data.values || [];
+    const targetNorm = norm(cond.condStatus || '');
+    let count = 0;
+    rows.forEach(row => {
+      const matchId = matchIdIdx >= 0 ? (row[matchIdIdx] || '').trim() : '';
+      if (!matchId) return;
+      const status = statusIdx >= 0 ? (row[statusIdx] || '').trim() : '';
+      if (norm(status) === targetNorm) count++;
+    });
+    const op = cond.condOp || '<=';
+    const val = parseInt(cond.condValue) || 0;
+    if (op === '<=') return count <= val;
+    if (op === '>=') return count >= val;
+    return count === val;
+  } catch (e) { console.error('[워크플로] 조건 체크 에러:', e.message); }
+  return false;
+}
+
+function registerWfJob(id, name, workspace) {
+  JOBS['wf:' + id] = {
+    name: `워크플로: ${name}`,
+    fn: () => runWfBlocks(workspace),
+  };
+}
+
+// 저장된 프리셋을 시작 시 등록
+for (const [id, preset] of Object.entries(wfPresetsData)) {
+  registerWfJob(id, preset.name, preset.workspace);
+}
+
+app.post('/api/wf/presets/:id', (req, res) => {
+  const { id } = req.params;
+  const { name, workspace } = req.body;
+  wfPresetsData[id] = { name, workspace };
+  saveWfPresets();
+  registerWfJob(id, name, workspace);
+  res.json({ ok: true });
+});
+
+app.delete('/api/wf/presets/:id', (req, res) => {
+  const { id } = req.params;
+  delete wfPresetsData[id];
+  saveWfPresets();
+  delete JOBS['wf:' + id];
+  Object.values(schedules).forEach(s => {
+    if (s.jobId === 'wf:' + id) removeSchedule(s.id);
+  });
+  res.json({ ok: true });
+});
+
 app.listen(PORT, () => {
   console.log(`서버 시작: http://localhost:${PORT}`);
 });

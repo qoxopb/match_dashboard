@@ -518,11 +518,34 @@
             </div>
           </div>
 
-          <!-- 오른쪽: 프리셋 목록 -->
+          <!-- 오른쪽: 프리셋 목록 + 스케줄 -->
           <div class="wf-presets" style="max-height:calc(100vh - 120px);align-self:start;">
             <div class="wf-section-title">프리셋</div>
             <div id="wf-preset-list"></div>
             <button class="wf-add-preset" onclick="addPreset()">+ 새 프리셋</button>
+
+            <!-- 프리셋 스케줄 설정 -->
+            <div id="wf-sched-section" style="display:none;margin-top:16px;border-top:1px solid #e0e0e0;padding-top:12px;">
+              <div class="wf-section-title">스케줄 설정</div>
+              <div style="margin-bottom:8px;">
+                <div style="display:flex;gap:0;margin-bottom:8px;border-bottom:2px solid #e0e0e0;">
+                  <div class="wf-sched-tab active" data-tab="interval" onclick="switchWfSchedTab('interval')" style="padding:6px 12px;font-size:12px;color:#999;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;">주기</div>
+                  <div class="wf-sched-tab" data-tab="alarm" onclick="switchWfSchedTab('alarm')" style="padding:6px 12px;font-size:12px;color:#999;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;">시간</div>
+                </div>
+                <div id="wf-sched-interval">
+                  <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;" id="wf-interval-chips"></div>
+                  <button class="wf-btn wf-btn-save" onclick="addWfInterval()" style="font-size:12px;padding:4px 12px;">추가</button>
+                </div>
+                <div id="wf-sched-alarm" style="display:none;">
+                  <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">
+                    <input type="time" id="wf-alarm-time" value="09:00" style="padding:4px 8px;border:1px solid #ddd;border-radius:4px;font-size:13px;">
+                    <div id="wf-alarm-days" style="display:flex;gap:3px;"></div>
+                  </div>
+                  <button class="wf-btn wf-btn-save" onclick="addWfAlarm()" style="font-size:12px;padding:4px 12px;">추가</button>
+                </div>
+              </div>
+              <div id="wf-sched-list" style="font-size:12px;"></div>
+            </div>
           </div>
         </div>
       </section>
@@ -828,12 +851,37 @@
       renderWorkspace();
     }
 
+    function getDropIndex(e, container) {
+      const list = e.currentTarget;
+      const blocks = [...list.children].filter(c => !c.classList.contains('wf-empty-msg'));
+      for (let i = 0; i < blocks.length; i++) {
+        const rect = blocks[i].getBoundingClientRect();
+        if (e.clientY < rect.top + rect.height / 2) return i;
+      }
+      return container.length;
+    }
+
     function dropOnWorkspace(e) {
       e.preventDefault();
       e.currentTarget.classList.remove('drag-over');
       try {
         const data = JSON.parse(e.dataTransfer.getData('application/json'));
-        handleDrop([], data);
+        const dropIdx = getDropIndex(e, wfWorkspace);
+        if (data.source === 'palette') {
+          wfWorkspace.splice(dropIdx, 0, { kind: 'job', jobId: data.jobId, label: data.label, cat: data.cat });
+        } else if (data.source === 'workspace') {
+          const srcPath = data.path;
+          if (srcPath.length === 1) {
+            const srcIdx = srcPath[0];
+            const block = wfWorkspace.splice(srcIdx, 1)[0];
+            const adj = srcIdx < dropIdx ? dropIdx - 1 : dropIdx;
+            wfWorkspace.splice(adj, 0, block);
+          } else {
+            handleDrop([], data);
+            return;
+          }
+        }
+        renderWorkspace();
       } catch {}
     }
     function dropOnContainer(e, path) {
@@ -1100,6 +1148,7 @@
       document.getElementById('wf-preset-name').value = preset ? preset.name : '';
       renderWorkspace();
       renderPresetList();
+      showWfSchedule();
     }
 
     function saveCurrentWorkspace() {
@@ -1114,6 +1163,11 @@
       if (preset) preset.name = newName;
       savePresetIndex();
       saveCurrentWorkspace();
+      // 서버에도 저장 (스케줄 실행용)
+      fetch('/api/wf/presets/' + wfCurrentId, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newName, workspace: wfWorkspace }),
+      });
       renderPresetList();
       alert('저장 완료');
     }
@@ -1134,6 +1188,7 @@
       wfPresets = wfPresets.filter(x => x.id !== id);
       localStorage.removeItem(WF_DATA_PREFIX + id);
       savePresetIndex();
+      fetch('/api/wf/presets/' + id, { method: 'DELETE' });
       if (wfCurrentId === id) {
         if (wfPresets.length > 0) selectPreset(wfPresets[0].id);
         else {
@@ -1204,6 +1259,96 @@
         alert('워크플로우 실행 완료');
       } catch (e) {
         alert('실행 에러: ' + e.message);
+      }
+    }
+
+    // --- 프리셋 스케줄 UI ---
+    const WF_INTERVALS = [5, 10, 20, 30, 60, 120];
+    let wfSelectedInterval = null;
+
+    function initWfSchedUI() {
+      const chips = document.getElementById('wf-interval-chips');
+      chips.innerHTML = WF_INTERVALS.map(m =>
+        `<div class="interval-chip" data-min="${m}" onclick="selectWfInterval(${m})" style="padding:4px 10px;border-radius:12px;font-size:12px;border:1px solid #ddd;cursor:pointer;background:#fff;">${m < 60 ? m+'분' : (m/60)+'시간'}</div>`
+      ).join('');
+      const days = document.getElementById('wf-alarm-days');
+      days.innerHTML = ['일','월','화','수','목','금','토'].map((d,i) =>
+        `<div class="day-chip" data-day="${i}" onclick="toggleDay(this)" style="width:26px;height:26px;border-radius:50%;font-size:11px;display:flex;align-items:center;justify-content:center;border:1px solid #ddd;cursor:pointer;background:#fff;">${d}</div>`
+      ).join('');
+    }
+
+    function selectWfInterval(min) {
+      wfSelectedInterval = min;
+      document.querySelectorAll('#wf-interval-chips .interval-chip').forEach(c =>
+        c.style.background = Number(c.dataset.min) === min ? '#1976d2' : '#fff'
+      );
+      document.querySelectorAll('#wf-interval-chips .interval-chip').forEach(c =>
+        c.style.color = Number(c.dataset.min) === min ? '#fff' : '#333'
+      );
+    }
+
+    function switchWfSchedTab(tab) {
+      document.querySelectorAll('.wf-sched-tab').forEach(t => {
+        t.style.color = t.dataset.tab === tab ? '#1976d2' : '#999';
+        t.style.borderBottomColor = t.dataset.tab === tab ? '#1976d2' : 'transparent';
+      });
+      document.getElementById('wf-sched-interval').style.display = tab === 'interval' ? '' : 'none';
+      document.getElementById('wf-sched-alarm').style.display = tab === 'alarm' ? '' : 'none';
+    }
+
+    async function addWfInterval() {
+      if (!wfCurrentId || !wfSelectedInterval) { alert('주기를 선택하세요'); return; }
+      await fetch('/api/schedule', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId: 'wf:' + wfCurrentId, type: 'interval', options: { minutes: wfSelectedInterval } }),
+      });
+      renderWfSchedules();
+    }
+
+    async function addWfAlarm() {
+      if (!wfCurrentId) return;
+      const time = document.getElementById('wf-alarm-time').value;
+      if (!time) { alert('시간을 입력하세요'); return; }
+      const [hh, mm] = time.split(':').map(Number);
+      const days = [...document.querySelectorAll('#wf-alarm-days .day-chip.selected')].map(c => Number(c.dataset.day));
+      await fetch('/api/schedule', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId: 'wf:' + wfCurrentId, type: 'alarm', options: { hour: hh, minute: mm, days } }),
+      });
+      renderWfSchedules();
+    }
+
+    async function renderWfSchedules() {
+      const list = document.getElementById('wf-sched-list');
+      if (!wfCurrentId) { list.innerHTML = ''; return; }
+      try {
+        const res = await fetch('/api/schedules');
+        const all = await res.json();
+        const items = all.filter(s => s.jobId === 'wf:' + wfCurrentId);
+        if (items.length === 0) { list.innerHTML = '<div style="color:#aaa;font-size:12px;">등록된 스케줄 없음</div>'; return; }
+        list.innerHTML = items.map(s => `
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;background:#fafafa;border-radius:6px;margin-bottom:4px;">
+            <div>
+              <label class="toggle" style="width:32px;height:18px;">
+                <input type="checkbox" ${s.enabled ? 'checked' : ''} onchange="toggleSchedule(${s.id}, this.checked);renderWfSchedules()">
+                <span class="toggle-slider" style="border-radius:18px;"></span>
+              </label>
+            </div>
+            <span style="flex:1;margin-left:8px;">${s.label} <span style="color:#999;">(${s.type === 'interval' ? '주기' : '시간'})</span></span>
+            <button onclick="removeSchedule(${s.id});renderWfSchedules()" style="background:none;border:none;color:#e53935;cursor:pointer;font-size:14px;">&times;</button>
+          </div>
+        `).join('');
+      } catch { list.innerHTML = ''; }
+    }
+
+    function showWfSchedule() {
+      const section = document.getElementById('wf-sched-section');
+      if (wfCurrentId) {
+        section.style.display = '';
+        initWfSchedUI();
+        renderWfSchedules();
+      } else {
+        section.style.display = 'none';
       }
     }
 
