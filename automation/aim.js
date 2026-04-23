@@ -826,13 +826,19 @@ async function iterateSearchResults(page, tag, studentSchedule, weekly, hoursNee
 
 // --- 모달 전부 닫기 ---
 async function closeAllModals(page) {
-  // ESC 여러 번 + 모달 사라짐 대기
-  for (let i = 0; i < 3; i++) {
-    const hasModal = await page.evaluate(() => !!document.querySelector('.ant-modal'));
-    if (!hasModal) break;
+  for (let i = 0; i < 5; i++) {
+    const modalCount = await page.evaluate(() => {
+      const modals = document.querySelectorAll('.ant-modal-wrap');
+      let visible = 0;
+      modals.forEach(m => { if (m.style.display !== 'none') visible++; });
+      return visible;
+    });
+    if (modalCount === 0) break;
     await page.keyboard.press('Escape');
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(600);
   }
+  // 모달 closing 애니메이션 대기
+  await page.waitForTimeout(300);
 }
 
 // --- 검색 결과 테이블 찾기 (timeline 헤더가 있는 테이블) ---
@@ -1054,7 +1060,10 @@ async function checkModalOrError(page) {
 }
 
 async function sendProposal(page, rowIdx, tag, tutorId) {
-  // 1) "전송하기" 버튼의 좌표를 구해서 마우스 클릭
+  // 1) 잔여 모달 확실히 닫기 (타임라인 모달이 전송하기를 가리는 문제 방지)
+  await closeAllModals(page);
+
+  // 2) "전송하기" 버튼의 좌표를 구해서 마우스 클릭 (모달 닫힌 후 좌표 계산)
   const sendBtnBox = await page.evaluate((idx) => {
     const tables = document.querySelectorAll('table');
     let table = null;
