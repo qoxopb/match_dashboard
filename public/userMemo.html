@@ -256,6 +256,7 @@
     <div class="icon">&#10003;</div>
     <div class="msg">모든 항목 처리 완료</div>
     <div class="sub" id="done-summary"></div>
+    <div class="sub" id="done-countdown" style="margin-top:12px;color:#999;font-size:13px;"></div>
   </div>
 
   <script>
@@ -587,6 +588,22 @@
       ds.style.display = '';
       if (msg) document.querySelector('#done-screen .msg').textContent = msg;
       document.getElementById('done-summary').textContent = `저장 ${counters.saved}건, 건너뛰기 ${counters.skipped}건`;
+
+      // 5초 카운트다운 후 탭 닫기
+      let sec = 5;
+      const cdEl = document.getElementById('done-countdown');
+      cdEl.textContent = `${sec}초 후 탭이 닫힙니다`;
+      const timer = setInterval(() => {
+        sec--;
+        if (sec > 0) {
+          cdEl.textContent = `${sec}초 후 탭이 닫힙니다`;
+        } else {
+          clearInterval(timer);
+          cdEl.textContent = '탭을 닫는 중...';
+          window.close();
+          setTimeout(() => { location.href = '/'; }, 500);
+        }
+      }, 1000);
     }
 
     init();
