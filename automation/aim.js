@@ -1034,6 +1034,25 @@ async function clickTimelineAndGetSchedule(page, rowIdx) {
 }
 
 // --- 매칭 제안 전송 ---
+async function checkModalOrError(page) {
+  return page.evaluate(() => {
+    const modals = document.querySelectorAll('.ant-modal');
+    for (const m of modals) {
+      const text = m.innerText;
+      if (/매칭\s*제안.*할까요|제안을\s*할까요/i.test(text)) return 'proposal';
+    }
+    const errorSelectors = '.ant-notification, .ant-notification-notice, .ant-message, .ant-message-notice, .ant-message-custom-content, .ant-alert, .ant-modal';
+    const errorEls = document.querySelectorAll(errorSelectors);
+    for (const el of errorEls) {
+      const t = el.textContent;
+      if (/orderStatus|paid.*아닙|주문.*상태|order_status/i.test(t)) {
+        return 'systemError: ' + t.substring(0, 150).replace(/\n/g, ' ');
+      }
+    }
+    return null;
+  });
+}
+
 async function sendProposal(page, rowIdx, tag, tutorId) {
   // 1) "전송하기" 버튼의 좌표를 구해서 마우스 클릭
   const sendBtnBox = await page.evaluate((idx) => {
@@ -1066,33 +1085,79 @@ async function sendProposal(page, rowIdx, tag, tutorId) {
     return false;
   }
 
-  await page.mouse.click(sendBtnBox.x, sendBtnBox.y);
-  console.log(`${tag} 튜터 ${tutorId} 전송하기 클릭`);
+  // 디버그: 클릭 좌표에 실제로 뭐가 있는지 확인
+  const hitInfo = await page.evaluate(({x, y}) => {
+    const el = document.elementFromPoint(x, y);
+    if (!el) return 'elementFromPoint: null';
+    return `elementFromPoint: <${el.tagName.toLowerCase()}> text="${el.textContent.trim().substring(0, 40)}" class="${el.className.toString().substring(0, 60)}"`;
+  }, sendBtnBox);
+  console.log(`${tag} 튜터 ${tutorId} 클릭 좌표(${Math.round(sendBtnBox.x)},${Math.round(sendBtnBox.y)}) ${hitInfo}`);
 
-  // 2) 클릭 직후 빠르게 체크 (알림이 빨리 사라질 수 있음)
-  let modalType = null;
-  for (let i = 0; i < 8; i++) {
+  // 방법1: mouse.click
+  await page.mouse.click(sendBtnBox.x, sendBtnBox.y);
+  console.log(`${tag} 튜터 ${tutorId} 전송하기 mouse.click 완료`);
+
+  // 300ms 대기 후 모달 확인
+  await page.waitForTimeout(300);
+  let modalType = await checkModalOrError(page);
+
+  // 방법2: mouse.click 실패 시 evaluate click fallback
+  if (!modalType) {
+    console.log(`${tag} 튜터 ${tutorId} mouse.click으로 모달 안 열림 → evaluate click 시도`);
+    await page.evaluate((idx) => {
+      const tables = document.querySelectorAll('table');
+      let table = null;
+      for (const t of tables) {
+        const headers = [...t.querySelectorAll('thead th')].map(h => h.textContent.trim());
+        if (headers.some(h => /^timeline$/i.test(h))) { table = t; }
+      }
+      if (!table) return;
+      const headers = [...table.querySelectorAll('thead th')].map(h => h.textContent.trim());
+      const talkIdx = headers.findIndex(h => /알림톡\s*전송/i.test(h));
+      if (talkIdx < 0) return;
+      const rows = [...table.querySelectorAll('tbody tr')].filter(r => r.querySelectorAll('td').length > 1);
+      if (!rows[idx]) return;
+      const cell = rows[idx].querySelectorAll('td')[talkIdx];
+      if (!cell) return;
+      const clickable = cell.querySelector('button, a, span[style*="cursor"], [role="button"]') || cell;
+      clickable.click();
+    }, rowIdx);
     await page.waitForTimeout(300);
-    modalType = await page.evaluate(() => {
-      // 모달 체크
-      const modals = document.querySelectorAll('.ant-modal');
-      for (const m of modals) {
-        const text = m.innerText;
-        if (/매칭\s*제안.*할까요|제안을\s*할까요/i.test(text)) return 'proposal';
+    modalType = await checkModalOrError(page);
+  }
+
+  // 방법3: 그래도 안 되면 dispatchEvent로 시도
+  if (!modalType) {
+    console.log(`${tag} 튜터 ${tutorId} evaluate click도 실패 → dispatchEvent 시도`);
+    await page.evaluate((idx) => {
+      const tables = document.querySelectorAll('table');
+      let table = null;
+      for (const t of tables) {
+        const headers = [...t.querySelectorAll('thead th')].map(h => h.textContent.trim());
+        if (headers.some(h => /^timeline$/i.test(h))) { table = t; }
       }
-      // 에러 모달/알림/메시지 — 넓은 범위 체크
-      const allText = document.body.innerText;
-      const errorSelectors = '.ant-notification, .ant-notification-notice, .ant-message, .ant-message-notice, .ant-message-custom-content, .ant-alert, .ant-modal';
-      const errorEls = document.querySelectorAll(errorSelectors);
-      for (const el of errorEls) {
-        const t = el.textContent;
-        if (/orderStatus|paid.*아닙|주문.*상태|order_status/i.test(t)) {
-          return 'systemError: ' + t.substring(0, 150).replace(/\n/g, ' ');
-        }
-      }
-      return null;
-    });
-    if (modalType) break;
+      if (!table) return;
+      const headers = [...table.querySelectorAll('thead th')].map(h => h.textContent.trim());
+      const talkIdx = headers.findIndex(h => /알림톡\s*전송/i.test(h));
+      if (talkIdx < 0) return;
+      const rows = [...table.querySelectorAll('tbody tr')].filter(r => r.querySelectorAll('td').length > 1);
+      if (!rows[idx]) return;
+      const cell = rows[idx].querySelectorAll('td')[talkIdx];
+      if (!cell) return;
+      const clickable = cell.querySelector('button, a, span[style*="cursor"], [role="button"]') || cell;
+      clickable.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+    }, rowIdx);
+    await page.waitForTimeout(500);
+    modalType = await checkModalOrError(page);
+  }
+
+  // 최종: 그래도 실패 시 좀 더 기다려봄
+  if (!modalType) {
+    for (let i = 0; i < 5; i++) {
+      await page.waitForTimeout(400);
+      modalType = await checkModalOrError(page);
+      if (modalType) break;
+    }
   }
 
   if (!modalType) {
