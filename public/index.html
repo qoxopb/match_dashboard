@@ -1249,6 +1249,16 @@
       } catch {}
     }
 
+    function deployCountdown(el) {
+      let sec = 5;
+      el.textContent = `재시작 중... ${sec}초 후 새로고침`;
+      const t = setInterval(() => {
+        sec--;
+        if (sec > 0) el.textContent = `재시작 중... ${sec}초 후 새로고침`;
+        else { clearInterval(t); location.reload(); }
+      }, 1000);
+    }
+
     async function deploy() {
       if (!confirm('서버 코드를 최신으로 업데이트합니다. 서버가 잠시 재시작됩니다.')) return;
       const msg = document.getElementById('deploy-msg');
@@ -1258,12 +1268,10 @@
         const data = await res.json();
         msg.textContent = data.message || '완료';
         if (data.ok) {
-          msg.textContent = '재시작 중... 5초 후 새로고침';
-          setTimeout(() => location.reload(), 5000);
+          deployCountdown(msg);
         }
       } catch (e) {
-        msg.textContent = '연결 끊김 — 재시작 중...';
-        setTimeout(() => location.reload(), 5000);
+        deployCountdown(msg);
       }
     }
 
