@@ -1,5 +1,10 @@
 [
   {
+    "version": "1.4.1",
+    "ts": "2604231100",
+    "changes": ["매칭제안 전송하기 클릭 3단계 fallback (mouse.click → evaluate click → dispatchEvent)", "전송하기 클�� 좌표 디버그 로그 추가"]
+  },
+  {
     "version": "1.4.0",
     "ts": "2604231030",
     "changes": ["유저메모 편집 진입 시 매칭결과 자동 확인 (어드민 상태 동기화 후 목록 표시)"]
