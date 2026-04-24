@@ -954,22 +954,27 @@
     }
 
     // 컨테이너 블록 외부(헤더 등)에 드롭 → children에 추가
-    function showContainerDropIndicatorById(e, containerPath) {
-      const containerEl = e.currentTarget.querySelector('.wf-loop-children');
-      if (!containerEl) return;
-      removeDropIndicator();
-      const indicator = document.createElement('div');
-      indicator.className = 'wf-drop-indicator';
-      const adder = containerEl.querySelector('select')?.parentElement;
-      if (adder) containerEl.insertBefore(indicator, adder);
-      else containerEl.appendChild(indicator);
-    }
-
-    function dropOnContainerFromBlock(e, containerPath) {
+    function containerDragOver(e) {
       e.preventDefault();
       e.stopPropagation();
       removeDropIndicator();
+      const childrenEl = e.currentTarget.querySelector('.wf-loop-children');
+      if (!childrenEl) return;
+      const indicator = document.createElement('div');
+      indicator.className = 'wf-drop-indicator';
+      const adder = childrenEl.querySelector('select')?.parentElement;
+      if (adder) childrenEl.insertBefore(indicator, adder);
+      else childrenEl.appendChild(indicator);
+    }
+
+    function containerDrop(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      removeDropIndicator();
+      const pathStr = e.currentTarget.dataset.containerPath;
+      if (!pathStr) return;
       try {
+        const containerPath = JSON.parse(pathStr);
         const data = JSON.parse(e.dataTransfer.getData('application/json'));
         const arr = getContainerArray(containerPath);
         if (data.source === 'palette') {
@@ -977,8 +982,7 @@
         } else if (data.source === 'workspace') {
           if (pathStartsWith(containerPath, data.path)) return;
           const block = removeBlockAt(data.path);
-          const targetArr = getContainerArray(containerPath);
-          targetArr.push(block);
+          getContainerArray(containerPath).push(block);
         }
         renderWorkspace();
       } catch {}
@@ -1110,8 +1114,8 @@
         : b.children.map((c, i) => renderBlock(c, [...path, i])).join('');
       return `
         <div class="wf-loop-block" draggable="true" ondragstart='dragStartWS(event, ${pathStr})'
-             ondragover="event.preventDefault();event.stopPropagation();showContainerDropIndicatorById(event,${pathStr});"
-             ondrop="dropOnContainerFromBlock(event,${pathStr})">
+             data-container-path='${pathStr}'
+             ondragover="containerDragOver(event)" ondrop="containerDrop(event)">
           <div class="wf-loop-header">
             <span>${headerHTML}</span>
             <div class="wf-ws-actions">
@@ -1134,8 +1138,8 @@
         : b.children.map((c, i) => renderBlock(c, [...path, i])).join('');
       return `
         <div class="wf-cond-block" draggable="true" ondragstart='dragStartWS(event, ${pathStr})'
-             ondragover="event.preventDefault();event.stopPropagation();showContainerDropIndicatorById(event,${pathStr});"
-             ondrop="dropOnContainerFromBlock(event,${pathStr})">
+             data-container-path='${pathStr}'
+             ondragover="containerDragOver(event)" ondrop="containerDrop(event)">
           <div class="wf-cond-header">
             <span>${headerHTML}</span>
             <div class="wf-ws-actions">
