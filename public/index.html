@@ -485,6 +485,10 @@
       <section class="view" id="view-workflow">
         <h1>워크플로</h1>
 
+        <div class="status-bar status-idle" id="wf-status-bar">
+          <span id="wf-status-text">대기 중</span>
+        </div>
+
         <div style="display:grid;grid-template-columns:1fr 240px 260px;gap:16px;">
           <!-- 왼쪽: 설정 바 + 팔레트 + 워크스페이스 -->
           <div>
@@ -785,6 +789,9 @@
       const bar = document.getElementById('status-bar');
       bar.className = 'status-bar status-running';
       bar.innerHTML = `<div class="spinner"></div><span>${name} 실행 중...</span><button class="btn-abort" onclick="stopTask()">중단하기</button>`;
+      const wfBar = document.getElementById('wf-status-bar');
+      wfBar.className = 'status-bar status-running';
+      wfBar.innerHTML = `<div class="spinner"></div><span>${name} 실행 중...</span><button class="btn-abort" onclick="stopTask()">중단하기</button>`;
       document.querySelectorAll('button:not(.btn-abort)').forEach(b => b.disabled = true);
     }
 
@@ -800,6 +807,9 @@
       const bar = document.getElementById('status-bar');
       bar.className = 'status-bar status-idle';
       bar.innerHTML = '<span>대기 중</span>';
+      const wfBar = document.getElementById('wf-status-bar');
+      wfBar.className = 'status-bar status-idle';
+      wfBar.innerHTML = '<span>대기 중</span>';
       document.querySelectorAll('button').forEach(b => b.disabled = false);
     }
 
