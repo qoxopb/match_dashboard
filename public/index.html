@@ -576,6 +576,15 @@
             <div id="wf-sched-list" style="font-size:12px;"></div>
           </div>
         </div>
+
+        <!-- 워크플로 실행 로그 -->
+        <div class="card" style="margin-top:16px;">
+          <div class="card-header">
+            <span class="card-title">실행 로그</span>
+            <button class="btn-small" style="background:#eee;color:#666;" onclick="clearWfLog()">지우기</button>
+          </div>
+          <div id="wf-log-box" style="background:#1a1a2e;color:#d4d4d4;font-family:'Consolas','Courier New',monospace;font-size:11.5px;line-height:1.6;padding:16px;border-radius:10px;height:250px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;"></div>
+        </div>
       </section>
 
       <!-- 당일 현황 -->
@@ -1345,8 +1354,24 @@
       renderPresetList();
     }
 
+    function wfLog(msg, cls) {
+      const box = document.getElementById('wf-log-box');
+      if (!box) return;
+      const time = new Date().toLocaleTimeString('ko-KR');
+      const line = document.createElement('div');
+      if (cls) line.style.color = cls === 'error' ? '#ff6b6b' : cls === 'success' ? '#69db7c' : '#d4d4d4';
+      line.textContent = `[${time}] ${msg}`;
+      box.appendChild(line);
+      box.scrollTop = box.scrollHeight;
+    }
+    function clearWfLog() { const box = document.getElementById('wf-log-box'); if (box) box.innerHTML = ''; }
+
     async function runOne(jobId) {
-      await fetch(`/api/run/${jobId}`, { method: 'POST' });
+      wfLog(`${jobId} 실행 중...`);
+      const res = await fetch(`/api/run/${jobId}`, { method: 'POST' });
+      const data = await res.json();
+      if (data.ok) wfLog(`${jobId} — ${data.message}`, 'success');
+      else wfLog(`${jobId} — ${data.message}`, 'error');
       await new Promise(r => setTimeout(r, 800));
     }
 
@@ -1376,16 +1401,20 @@
         if (b.kind === 'job') {
           await runOne(b.jobId);
         } else if (b.kind === 'loop') {
+          wfLog(`반복 ${b.count}회 시작`);
           for (let r = 0; r < b.count; r++) {
+            wfLog(`반복 ${r + 1}/${b.count}`);
             await runBlocks(b.children);
           }
+          wfLog(`반복 ${b.count}회 완료`, 'success');
         } else if (b.kind === 'condLoop') {
+          wfLog(`조건 반복 시작 (최대 ${b.maxIter}회)`);
           for (let r = 0; r < b.maxIter; r++) {
-            // 매 회차 시작 전 조건 체크
             if (await checkCondition(b)) {
-              console.log(`[wf] 조건 만족 — ${r}회차에 종료`);
+              wfLog(`조건 만족 — ${r + 1}회차에 종료`, 'success');
               break;
             }
+            wfLog(`조건 미충족 — ${r + 1}/${b.maxIter}회차 실행`);
             await runBlocks(b.children);
           }
         }
@@ -1406,11 +1435,12 @@
       if (wfWorkspace.length === 0) { alert('실행할 블럭이 없습니다'); return; }
       const maxJobs = countAllJobs(wfWorkspace);
       if (!confirm(`최대 ${maxJobs}개 작업을 실행합니다.\n진행할까요?`)) return;
+      wfLog('=== 워크플로 실행 시작 ===');
       try {
         await runBlocks(wfWorkspace);
-        alert('워크플로우 실행 완료');
+        wfLog('=== 워크플로 실행 완료 ===', 'success');
       } catch (e) {
-        alert('실행 에러: ' + e.message);
+        wfLog(`=== 워크플로 에러: ${e.message} ===`, 'error');
       }
     }
 
