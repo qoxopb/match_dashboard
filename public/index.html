@@ -792,7 +792,7 @@
       const wfBar = document.getElementById('wf-status-bar');
       wfBar.className = 'status-bar status-running';
       wfBar.innerHTML = `<div class="spinner"></div><span>${name} 실행 중...</span><button class="btn-abort" onclick="stopTask()">중단하기</button>`;
-      document.querySelectorAll('button:not(.btn-abort)').forEach(b => b.disabled = true);
+      document.querySelectorAll('#view-features button:not(.btn-abort)').forEach(b => b.disabled = true);
     }
 
     async function stopTask() {
@@ -810,7 +810,7 @@
       const wfBar = document.getElementById('wf-status-bar');
       wfBar.className = 'status-bar status-idle';
       wfBar.innerHTML = '<span>대기 중</span>';
-      document.querySelectorAll('button').forEach(b => b.disabled = false);
+      document.querySelectorAll('#view-features button').forEach(b => b.disabled = false);
     }
 
     function appendLog(text, cls) {
