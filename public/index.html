@@ -1296,21 +1296,37 @@
           blocks = d.workspace || [];
         } catch {}
         const total = countBlocks(blocks);
-        const scheds = _wfSchedCache.filter(s => s.jobId === 'wf:' + p.id && s.enabled);
+        const allScheds = _wfSchedCache.filter(s => s.jobId === 'wf:' + p.id);
+        const enabledScheds = allScheds.filter(s => s.enabled);
+        const hasSchedule = allScheds.length > 0;
+        const isActive = enabledScheds.length > 0;
         let metaText = '';
-        if (scheds.length === 1) metaText = `${scheds[0].label} · 블록 ${total}개`;
-        else if (scheds.length > 1) metaText = `스케줄 ${scheds.length}개 · 블록 ${total}개`;
+        if (enabledScheds.length === 1) metaText = `${enabledScheds[0].label} · 블록 ${total}개`;
+        else if (enabledScheds.length > 1) metaText = `스케줄 ${enabledScheds.length}개 · 블록 ${total}개`;
+        else if (allScheds.length > 0) metaText = `스케줄 ${allScheds.length}개(꺼짐) · 블록 ${total}개`;
         else metaText = `블록 ${total}개`;
+        const playBtn = hasSchedule ? `<button class="wf-preset-play" onclick="event.stopPropagation();togglePresetSchedules('${p.id}',${!isActive})" title="${isActive ? '일시정지' : '재생'}" style="background:none;border:none;cursor:pointer;font-size:16px;padding:2px 4px;color:${isActive ? '#43a047' : '#999'};">${isActive ? '&#9646;&#9646;' : '&#9654;'}</button>` : '';
         return `
           <div class="wf-preset-item ${p.id === wfCurrentId ? 'active' : ''}" onclick="selectPreset('${p.id}')">
             <div style="flex:1;min-width:0;">
               <div class="wf-preset-name">${escapeHtml(p.name)}</div>
               <div class="wf-preset-meta">${escapeHtml(metaText)}</div>
             </div>
+            ${playBtn}
             <button class="wf-preset-del" onclick="event.stopPropagation();deletePreset('${p.id}')" title="삭제">×</button>
           </div>
         `;
       }).join('');
+    }
+
+    async function togglePresetSchedules(presetId, enable) {
+      const scheds = _wfSchedCache.filter(s => s.jobId === 'wf:' + presetId);
+      await Promise.all(scheds.map(s =>
+        fetch(`/api/schedule/${s.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: enable }) })
+      ));
+      await refreshWfSchedCache();
+      renderPresetList();
+      renderWfSchedules();
     }
 
     function selectPreset(id) {
