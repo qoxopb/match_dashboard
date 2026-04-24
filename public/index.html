@@ -214,8 +214,8 @@
       box-shadow: 0 2px 0 rgba(0,0,0,.15);
     }
     .wf-cond-header {
-      padding: 10px 14px; display: flex; flex-wrap: wrap; align-items: center;
-      gap: 6px; font-size: 12px; font-weight: 500;
+      padding: 10px 14px; display: flex; flex-wrap: nowrap; align-items: center;
+      gap: 6px; font-size: 12px; font-weight: 500; white-space: nowrap;
     }
     .wf-cond-header select, .wf-cond-header input {
       background: rgba(255,255,255,.2); border: 1px solid rgba(255,255,255,.3);
@@ -1069,8 +1069,6 @@
                ondragover="event.preventDefault();event.stopPropagation();showDropIndicator(event);" ondrop="dropOnWorkspace(event)">
             <span>${escapeHtml(b.label)}</span>
             <div class="wf-ws-actions">
-              <button title="위로" onclick='moveBlock(${pathStr}, -1)'>↑</button>
-              <button title="아래로" onclick='moveBlock(${pathStr}, 1)'>↓</button>
               <button title="삭제" onclick='removeBlock(${pathStr})'>×</button>
             </div>
           </div>
@@ -1080,29 +1078,7 @@
           `반복 <input type="number" class="wf-loop-count" min="1" value="${b.count}" onchange='updateLoopCount(${pathStr}, this.value)'> 회`
         );
       } else if (b.kind === 'condLoop') {
-        const condUI = `
-          조건:
-          <select onchange='updateCondField(${pathStr},"condType",this.value)'>
-            <option value="new" ${b.condType==='new'?'selected':''}>신규</option>
-            <option value="rematch" ${b.condType==='rematch'?'selected':''}>재매칭</option>
-          </select>
-          <select onchange='updateCondField(${pathStr},"condStatus",this.value)'>
-            <option value="" ${b.condStatus===''?'selected':''}>미처리</option>
-            <option value="매칭중" ${b.condStatus==='매칭중'?'selected':''}>매칭중</option>
-            <option value="확인 필요" ${b.condStatus==='확인 필요'?'selected':''}>확인 필요</option>
-            <option value="보류" ${b.condStatus==='보류'?'selected':''}>보류</option>
-            <option value="첫수업전재매칭" ${b.condStatus==='첫수업전재매칭'?'selected':''}>첫수업전재매칭</option>
-            <option value="일반 재매칭" ${b.condStatus==='일반 재매칭'?'selected':''}>일반 재매칭</option>
-          </select>
-          건수
-          <select onchange='updateCondField(${pathStr},"condOp",this.value)'>
-            <option value="<=" ${b.condOp==='<='?'selected':''}>≤</option>
-            <option value=">=" ${b.condOp==='>='?'selected':''}>≥</option>
-            <option value="=" ${b.condOp==='='?'selected':''}>=</option>
-          </select>
-          <input type="number" min="0" value="${b.condValue}" style="width:50px" onchange='updateCondField(${pathStr},"condValue",this.value)'>
-          까지 (최대 <input type="number" min="1" value="${b.maxIter}" style="width:40px" onchange='updateCondField(${pathStr},"maxIter",this.value)'>회)
-        `;
+        const condUI = `조건: <select onchange='updateCondField(${pathStr},"condType",this.value)'><option value="new" ${b.condType==='new'?'selected':''}>신규</option><option value="rematch" ${b.condType==='rematch'?'selected':''}>재매칭</option></select> <select onchange='updateCondField(${pathStr},"condStatus",this.value)'><option value="" ${b.condStatus===''?'selected':''}>미처리</option><option value="매칭중" ${b.condStatus==='매칭중'?'selected':''}>매칭중</option><option value="확인 필요" ${b.condStatus==='확인 필요'?'selected':''}>확인 필요</option><option value="보류" ${b.condStatus==='보류'?'selected':''}>보류</option><option value="첫수업전재매칭" ${b.condStatus==='첫수업전재매칭'?'selected':''}>첫수업전재매칭</option><option value="일반 재매칭" ${b.condStatus==='일반 재매칭'?'selected':''}>일반 재매칭</option></select> 건수 <select onchange='updateCondField(${pathStr},"condOp",this.value)'><option value="<=" ${b.condOp==='<='?'selected':''}>≤</option><option value=">=" ${b.condOp==='>='?'selected':''}>≥</option><option value="=" ${b.condOp==='='?'selected':''}>=</option></select> <input type="number" min="0" value="${b.condValue}" style="width:50px" onchange='updateCondField(${pathStr},"condValue",this.value)'> 까지 (최대 <input type="number" min="1" value="${b.maxIter}" style="width:40px" onchange='updateCondField(${pathStr},"maxIter",this.value)'>회)`;
         return renderCondContainer(b, path, pathStr, condUI);
       }
       return '';
@@ -1119,8 +1095,6 @@
           <div class="wf-loop-header">
             <span>${headerHTML}</span>
             <div class="wf-ws-actions">
-              <button title="위로" onclick='moveBlock(${pathStr}, -1)'>↑</button>
-              <button title="아래로" onclick='moveBlock(${pathStr}, 1)'>↓</button>
               <button title="삭제" onclick='removeBlock(${pathStr})'>×</button>
             </div>
           </div>
@@ -1143,8 +1117,6 @@
           <div class="wf-cond-header">
             <span>${headerHTML}</span>
             <div class="wf-ws-actions">
-              <button title="위로" onclick='moveBlock(${pathStr}, -1)'>↑</button>
-              <button title="아래로" onclick='moveBlock(${pathStr}, 1)'>↓</button>
               <button title="삭제" onclick='removeBlock(${pathStr})'>×</button>
             </div>
           </div>
