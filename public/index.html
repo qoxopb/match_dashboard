@@ -916,13 +916,66 @@
         renderWorkspace();
       } catch {}
     }
-    function dropOnContainer(e, path) {
+    function getContainerDropIndex(e, containerPath) {
+      const containerEl = e.currentTarget;
+      const blocks = [...containerEl.children].filter(c =>
+        !c.classList.contains('wf-empty-msg') && !c.classList.contains('wf-drop-indicator') && !c.querySelector('select')
+      );
+      const arr = getContainerArray(containerPath);
+      for (let i = 0; i < blocks.length; i++) {
+        const rect = blocks[i].getBoundingClientRect();
+        if (e.clientY < rect.top + rect.height / 2) return i;
+      }
+      return arr.length;
+    }
+
+    function showContainerDropIndicator(e) {
+      removeDropIndicator();
+      const containerEl = e.currentTarget;
+      const blocks = [...containerEl.children].filter(c =>
+        !c.classList.contains('wf-empty-msg') && !c.classList.contains('wf-drop-indicator') && !c.querySelector('select')
+      );
+      const indicator = document.createElement('div');
+      indicator.className = 'wf-drop-indicator';
+      let inserted = false;
+      for (let i = 0; i < blocks.length; i++) {
+        const rect = blocks[i].getBoundingClientRect();
+        if (e.clientY < rect.top + rect.height / 2) {
+          containerEl.insertBefore(indicator, blocks[i]);
+          inserted = true;
+          break;
+        }
+      }
+      if (!inserted) {
+        const adder = containerEl.querySelector('select')?.parentElement;
+        if (adder) containerEl.insertBefore(indicator, adder);
+        else containerEl.appendChild(indicator);
+      }
+    }
+
+    function dropOnContainer(e, containerPath) {
       e.preventDefault();
       e.stopPropagation();
+      removeDropIndicator();
       e.currentTarget.classList.remove('drag-over');
       try {
         const data = JSON.parse(e.dataTransfer.getData('application/json'));
-        handleDrop(path, data);
+        const dropIdx = getContainerDropIndex(e, containerPath);
+        const arr = getContainerArray(containerPath);
+        if (data.source === 'palette') {
+          arr.splice(dropIdx, 0, { kind: 'job', jobId: data.jobId, label: data.label, cat: data.cat });
+        } else if (data.source === 'workspace') {
+          const srcPath = data.path;
+          if (pathStartsWith(containerPath, srcPath)) return;
+          const block = removeBlockAt(srcPath);
+          // 같은 컨테이너 내 이동 시 인덱스 조정
+          const sameContainer = srcPath.length - 1 === containerPath.length &&
+            srcPath.slice(0, -1).every((v, i) => v === containerPath[i]);
+          const adj = sameContainer && srcPath[srcPath.length - 1] < dropIdx ? dropIdx - 1 : dropIdx;
+          const targetArr = getContainerArray(containerPath);
+          targetArr.splice(adj, 0, block);
+        }
+        renderWorkspace();
       } catch {}
     }
 
@@ -1034,7 +1087,7 @@
               <button title="삭제" onclick='removeBlock(${pathStr})'>×</button>
             </div>
           </div>
-          <div class="wf-loop-children" ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="dropOnContainer(event, ${pathStr})">
+          <div class="wf-loop-children" ondragover="event.preventDefault();event.stopPropagation();showContainerDropIndicator(event);" ondragleave="if(!event.currentTarget.contains(event.relatedTarget)){removeDropIndicator();}" ondrop="dropOnContainer(event, ${pathStr})">
             ${childrenHtml}
             ${childAdderSelect(pathStr)}
           </div>
@@ -1056,7 +1109,7 @@
               <button title="삭제" onclick='removeBlock(${pathStr})'>×</button>
             </div>
           </div>
-          <div class="wf-loop-children" ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="dropOnContainer(event, ${pathStr})">
+          <div class="wf-loop-children" ondragover="event.preventDefault();event.stopPropagation();showContainerDropIndicator(event);" ondragleave="if(!event.currentTarget.contains(event.relatedTarget)){removeDropIndicator();}" ondrop="dropOnContainer(event, ${pathStr})">
             ${childrenHtml}
             ${childAdderSelect(pathStr)}
           </div>
@@ -1080,6 +1133,8 @@
             <option value='{"jobId":"statusCheck:rematch","label":"재매칭 결과 확인","cat":"status"}'>재매칭 결과 확인</option>
             <option value='{"jobId":"statusCheck","label":"전체 매칭결과 확인","cat":"status"}'>전체 매칭결과 확인</option>
             <option value='{"jobId":"monthly","label":"월별 탭 생성","cat":"monthly"}'>월별 탭 생성</option>
+            <option value='{"kind":"loop"}'>반복 N회</option>
+            <option value='{"kind":"condLoop"}'>조건 반복</option>
           </select>
         </div>
       `;
@@ -1096,12 +1151,16 @@
     function addToLoop(loopPath, selectEl) {
       if (!selectEl.value) return;
       const block = JSON.parse(selectEl.value);
-      let target = wfWorkspace;
-      for (let i = 0; i < loopPath.length; i++) target = target[loopPath[i]].children || target[loopPath[i]];
-      // loopPath가 가리키는 건 loop 자신
       let parent = wfWorkspace;
       for (let i = 0; i < loopPath.length - 1; i++) parent = parent[loopPath[i]].children;
-      parent[loopPath[loopPath.length - 1]].children.push({ kind: 'job', ...block });
+      const container = parent[loopPath[loopPath.length - 1]];
+      if (block.kind === 'loop') {
+        container.children.push({ kind: 'loop', count: 2, children: [] });
+      } else if (block.kind === 'condLoop') {
+        container.children.push({ kind: 'condLoop', condType: 'new', condStatus: '', condOp: '<=', condValue: 0, maxIter: 5, children: [] });
+      } else {
+        container.children.push({ kind: 'job', ...block });
+      }
       renderWorkspace();
     }
 
