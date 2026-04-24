@@ -74,7 +74,7 @@ function getBaseJobId(jobId) {
   // 'aim:new', 'aim:rematch', 'aim' → 'aim'
   // 'statusCheck:new' → 'statusCheck'
   // 'wf:123' → 'wf:123' (워크플로 자체는 고유)
-  if (jobId.startsWith('wf:')) return jobId;
+  if (jobId.startsWith('wf:')) return 'wf';
   return jobId.split(':')[0];
 }
 
