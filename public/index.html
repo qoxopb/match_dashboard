@@ -1424,6 +1424,32 @@
     }
     function clearWfLog() { const box = document.getElementById('wf-log-box'); if (box) box.innerHTML = ''; }
 
+    // 서버 로그에서 워크플로 관련 항목을 폴링해서 표시
+    let _lastWfLogCount = 0;
+    async function fetchWfServerLogs() {
+      try {
+        const res = await fetch('/api/logs');
+        const data = await res.json();
+        const wfLogs = data.logs.filter(l => /워크플로|스케줄.*워크플로|wf:|큐/.test(l));
+        if (wfLogs.length === _lastWfLogCount) return;
+        const box = document.getElementById('wf-log-box');
+        if (!box) return;
+        // 새로 추가된 것만
+        const newLogs = wfLogs.slice(_lastWfLogCount);
+        _lastWfLogCount = wfLogs.length;
+        newLogs.forEach(log => {
+          const line = document.createElement('div');
+          if (log.includes('[ERROR]')) line.style.color = '#ff6b6b';
+          else if (log.includes('완료') || log.includes('성공')) line.style.color = '#69db7c';
+          else line.style.color = '#90caf9';
+          line.textContent = log;
+          box.appendChild(line);
+        });
+        box.scrollTop = box.scrollHeight;
+      } catch {}
+    }
+    setInterval(fetchWfServerLogs, 3000);
+
     async function runOne(labelOrId) {
       wfLog(`▶ ${labelOrId} 시작`);
       // labelOrId가 label이면 jobId를 찾아야 함 — 하지만 runBlocks에서 jobId도 같이 넘김
