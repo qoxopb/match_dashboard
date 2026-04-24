@@ -1320,10 +1320,13 @@
     }
 
     async function togglePresetSchedules(presetId, enable) {
+      const preset = wfPresets.find(p => p.id === presetId);
+      const name = preset ? preset.name : presetId;
       const scheds = _wfSchedCache.filter(s => s.jobId === 'wf:' + presetId);
       await Promise.all(scheds.map(s =>
         fetch(`/api/schedule/${s.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: enable }) })
       ));
+      wfLog(enable ? `▶ ${name} 스케줄 활성화` : `⏸ ${name} 스케줄 비활성화`);
       await refreshWfSchedCache();
       renderPresetList();
       renderWfSchedules();
