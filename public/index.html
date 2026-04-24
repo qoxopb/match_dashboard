@@ -976,13 +976,14 @@
       try {
         const containerPath = JSON.parse(pathStr);
         const data = JSON.parse(e.dataTransfer.getData('application/json'));
-        const arr = getContainerArray(containerPath);
+        // 제거 전에 참조를 확보해야 인덱스 밀림 방지
+        const targetArr = getContainerArray(containerPath);
         if (data.source === 'palette') {
-          arr.push({ kind: 'job', jobId: data.jobId, label: data.label, cat: data.cat });
+          targetArr.push({ kind: 'job', jobId: data.jobId, label: data.label, cat: data.cat });
         } else if (data.source === 'workspace') {
           if (pathStartsWith(containerPath, data.path)) return;
           const block = removeBlockAt(data.path);
-          getContainerArray(containerPath).push(block);
+          targetArr.push(block);
         }
         renderWorkspace();
       } catch {}
@@ -996,18 +997,17 @@
       try {
         const data = JSON.parse(e.dataTransfer.getData('application/json'));
         const dropIdx = getContainerDropIndex(e, containerPath);
-        const arr = getContainerArray(containerPath);
+        // 제거 전에 참조를 확보해야 인덱스 밀림 방지
+        const targetArr = getContainerArray(containerPath);
         if (data.source === 'palette') {
-          arr.splice(dropIdx, 0, { kind: 'job', jobId: data.jobId, label: data.label, cat: data.cat });
+          targetArr.splice(dropIdx, 0, { kind: 'job', jobId: data.jobId, label: data.label, cat: data.cat });
         } else if (data.source === 'workspace') {
           const srcPath = data.path;
           if (pathStartsWith(containerPath, srcPath)) return;
-          const block = removeBlockAt(srcPath);
-          // 같은 컨테이너 내 이동 시 인덱스 조정
           const sameContainer = srcPath.length - 1 === containerPath.length &&
             srcPath.slice(0, -1).every((v, i) => v === containerPath[i]);
+          const block = removeBlockAt(srcPath);
           const adj = sameContainer && srcPath[srcPath.length - 1] < dropIdx ? dropIdx - 1 : dropIdx;
-          const targetArr = getContainerArray(containerPath);
           targetArr.splice(adj, 0, block);
         }
         renderWorkspace();
