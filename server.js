@@ -126,11 +126,19 @@ function addSchedule(jobId, type, options) {
       label = `${hh}:${mm} (매일)`;
     }
   } else if (type === 'date') {
-    const { hour, minute, date, month, dateStr } = options;
+    const { hour, minute, date, month, repeat, dateStr } = options;
     const hh = String(hour).padStart(2, '0');
     const mm = String(minute).padStart(2, '0');
-    cronExpr = `${minute} ${hour} ${date} ${month} *`;
-    label = `${dateStr} ${hh}:${mm}`;
+    if (repeat === 'monthly') {
+      cronExpr = `${minute} ${hour} ${date} * *`;
+      label = `매월 ${date}일 ${hh}:${mm}`;
+    } else if (repeat === 'yearly') {
+      cronExpr = `${minute} ${hour} ${date} ${month} *`;
+      label = `매년 ${month}/${date} ${hh}:${mm}`;
+    } else {
+      cronExpr = `${minute} ${hour} ${date} ${month} *`;
+      label = `${dateStr} ${hh}:${mm} (1회)`;
+    }
   }
 
   const cronTask = cron.schedule(cronExpr, async () => {

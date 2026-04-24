@@ -547,7 +547,7 @@
               <div style="display:flex;gap:0;margin-bottom:8px;border-bottom:2px solid #e0e0e0;">
                 <div class="wf-sched-tab active" data-tab="interval" onclick="switchWfSchedTab('interval')" style="padding:6px 12px;font-size:12px;color:#999;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;">주기</div>
                 <div class="wf-sched-tab" data-tab="alarm" onclick="switchWfSchedTab('alarm')" style="padding:6px 12px;font-size:12px;color:#999;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;">시간</div>
-                <div class="wf-sched-tab" data-tab="date" onclick="switchWfSchedTab('date')" style="padding:6px 12px;font-size:12px;color:#999;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;">일��</div>
+                <div class="wf-sched-tab" data-tab="date" onclick="switchWfSchedTab('date')" style="padding:6px 12px;font-size:12px;color:#999;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;">일자</div>
               </div>
               <div id="wf-sched-interval">
                 <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;" id="wf-interval-chips"></div>
@@ -564,6 +564,11 @@
                 <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">
                   <input type="date" id="wf-date-picker" style="padding:4px 8px;border:1px solid #ddd;border-radius:4px;font-size:13px;">
                   <input type="time" id="wf-date-time" value="09:00" style="padding:4px 8px;border:1px solid #ddd;border-radius:4px;font-size:13px;">
+                </div>
+                <div style="display:flex;gap:4px;margin-bottom:8px;">
+                  <label style="font-size:12px;display:flex;align-items:center;gap:3px;cursor:pointer;"><input type="radio" name="wf-date-repeat" value="once" checked> 1회</label>
+                  <label style="font-size:12px;display:flex;align-items:center;gap:3px;cursor:pointer;"><input type="radio" name="wf-date-repeat" value="monthly"> 매월</label>
+                  <label style="font-size:12px;display:flex;align-items:center;gap:3px;cursor:pointer;"><input type="radio" name="wf-date-repeat" value="yearly"> 매년</label>
                 </div>
                 <button class="wf-btn wf-btn-save" onclick="addWfDate()" style="font-size:12px;padding:4px 12px;">추가</button>
               </div>
@@ -1486,15 +1491,14 @@
       const dateVal = document.getElementById('wf-date-picker').value;
       const timeVal = document.getElementById('wf-date-time').value;
       if (!dateVal || !timeVal) { alert('날짜와 시간을 입력하세요'); return; }
+      const repeat = document.querySelector('input[name="wf-date-repeat"]:checked').value;
       const [hh, mm] = timeVal.split(':').map(Number);
       const d = new Date(dateVal);
-      const day = d.getDay(); // 0=일 ~ 6=토
       const month = d.getMonth() + 1;
       const date = d.getDate();
-      // cron: 분 시 일 월 요일
       await fetch('/api/schedule', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jobId: 'wf:' + wfCurrentId, type: 'date', options: { hour: hh, minute: mm, date, month, dayOfWeek: day, dateStr: dateVal } }),
+        body: JSON.stringify({ jobId: 'wf:' + wfCurrentId, type: 'date', options: { hour: hh, minute: mm, date, month, repeat, dateStr: dateVal } }),
       });
       await refreshWfSchedCache();
       renderWfSchedules();
