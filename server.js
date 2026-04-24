@@ -125,6 +125,12 @@ function addSchedule(jobId, type, options) {
       cronExpr = `${minute} ${hour} * * *`;
       label = `${hh}:${mm} (매일)`;
     }
+  } else if (type === 'date') {
+    const { hour, minute, date, month, dateStr } = options;
+    const hh = String(hour).padStart(2, '0');
+    const mm = String(minute).padStart(2, '0');
+    cronExpr = `${minute} ${hour} ${date} ${month} *`;
+    label = `${dateStr} ${hh}:${mm}`;
   }
 
   const cronTask = cron.schedule(cronExpr, async () => {

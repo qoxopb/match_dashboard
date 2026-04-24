@@ -547,6 +547,7 @@
               <div style="display:flex;gap:0;margin-bottom:8px;border-bottom:2px solid #e0e0e0;">
                 <div class="wf-sched-tab active" data-tab="interval" onclick="switchWfSchedTab('interval')" style="padding:6px 12px;font-size:12px;color:#999;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;">주기</div>
                 <div class="wf-sched-tab" data-tab="alarm" onclick="switchWfSchedTab('alarm')" style="padding:6px 12px;font-size:12px;color:#999;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;">시간</div>
+                <div class="wf-sched-tab" data-tab="date" onclick="switchWfSchedTab('date')" style="padding:6px 12px;font-size:12px;color:#999;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;">일��</div>
               </div>
               <div id="wf-sched-interval">
                 <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;" id="wf-interval-chips"></div>
@@ -558,6 +559,13 @@
                   <div id="wf-alarm-days" style="display:flex;gap:3px;"></div>
                 </div>
                 <button class="wf-btn wf-btn-save" onclick="addWfAlarm()" style="font-size:12px;padding:4px 12px;">추가</button>
+              </div>
+              <div id="wf-sched-date" style="display:none;">
+                <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">
+                  <input type="date" id="wf-date-picker" style="padding:4px 8px;border:1px solid #ddd;border-radius:4px;font-size:13px;">
+                  <input type="time" id="wf-date-time" value="09:00" style="padding:4px 8px;border:1px solid #ddd;border-radius:4px;font-size:13px;">
+                </div>
+                <button class="wf-btn wf-btn-save" onclick="addWfDate()" style="font-size:12px;padding:4px 12px;">추가</button>
               </div>
             </div>
             <div id="wf-sched-list" style="font-size:12px;"></div>
@@ -1422,6 +1430,9 @@
       days.innerHTML = ['일','월','화','수','목','금','토'].map((d,i) =>
         `<div class="day-chip" data-day="${i}" onclick="toggleDay(this)" style="width:26px;height:26px;border-radius:50%;font-size:11px;display:flex;align-items:center;justify-content:center;border:1px solid #ddd;cursor:pointer;background:#fff;">${d}</div>`
       ).join('');
+      // 일자 기본값: 오늘
+      const dp = document.getElementById('wf-date-picker');
+      if (dp && !dp.value) dp.value = new Date().toISOString().split('T')[0];
     }
 
     function selectWfInterval(min) {
@@ -1441,6 +1452,7 @@
       });
       document.getElementById('wf-sched-interval').style.display = tab === 'interval' ? '' : 'none';
       document.getElementById('wf-sched-alarm').style.display = tab === 'alarm' ? '' : 'none';
+      document.getElementById('wf-sched-date').style.display = tab === 'date' ? '' : 'none';
     }
 
     async function addWfInterval() {
@@ -1469,6 +1481,26 @@
       renderPresetList();
     }
 
+    async function addWfDate() {
+      if (!wfCurrentId) return;
+      const dateVal = document.getElementById('wf-date-picker').value;
+      const timeVal = document.getElementById('wf-date-time').value;
+      if (!dateVal || !timeVal) { alert('날짜와 시간을 입력하세요'); return; }
+      const [hh, mm] = timeVal.split(':').map(Number);
+      const d = new Date(dateVal);
+      const day = d.getDay(); // 0=일 ~ 6=토
+      const month = d.getMonth() + 1;
+      const date = d.getDate();
+      // cron: 분 시 일 월 요일
+      await fetch('/api/schedule', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId: 'wf:' + wfCurrentId, type: 'date', options: { hour: hh, minute: mm, date, month, dayOfWeek: day, dateStr: dateVal } }),
+      });
+      await refreshWfSchedCache();
+      renderWfSchedules();
+      renderPresetList();
+    }
+
     async function renderWfSchedules() {
       const list = document.getElementById('wf-sched-list');
       if (!wfCurrentId) { list.innerHTML = ''; return; }
@@ -1485,7 +1517,7 @@
                 <span class="toggle-slider" style="border-radius:18px;"></span>
               </label>
             </div>
-            <span style="flex:1;margin-left:8px;">${s.label} <span style="color:#999;">(${s.type === 'interval' ? '주기' : '시간'})</span></span>
+            <span style="flex:1;margin-left:8px;">${s.label} <span style="color:#999;">(${s.type === 'interval' ? '주기' : s.type === 'date' ? '일자' : '시간'})</span></span>
             <button onclick="removeSchedule(${s.id});renderWfSchedules()" style="background:none;border:none;color:#e53935;cursor:pointer;font-size:14px;">&times;</button>
           </div>
         `).join('');
