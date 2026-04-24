@@ -65,12 +65,33 @@ const JOBS = {
   }},
 };
 
+// 실행 중인 작업 세트 + 대기 큐
+const runningJobs = new Set(); // 실행 중인 baseJobId들
+const taskQueue = []; // { jobId, resolve }
+
+function getBaseJobId(jobId) {
+  // 'wf:xxx' → 워크플로 내부 블록의 실제 jobId 기준이 아닌, 최상위 jobId 그룹
+  // 'aim:new', 'aim:rematch', 'aim' → 'aim'
+  // 'statusCheck:new' → 'statusCheck'
+  // 'wf:123' → 'wf:123' (워크플로 자체는 고유)
+  if (jobId.startsWith('wf:')) return jobId;
+  return jobId.split(':')[0];
+}
+
 async function runTask(jobId) {
   const job = JOBS[jobId];
   if (!job) return { ok: false, message: `알 수 없는 작업: ${jobId}` };
-  if (running) return { ok: false, message: `"${running}" 실행 중입니다.` };
 
-  running = job.name;
+  const baseId = getBaseJobId(jobId);
+
+  // 같은 종류 실행 중이면 큐에 넣고 대기
+  if (runningJobs.has(baseId)) {
+    addLog(`[큐] ${job.name} 대기 (${baseId} 실행 중)`);
+    await new Promise(resolve => { taskQueue.push({ baseId, resolve }); });
+  }
+
+  runningJobs.add(baseId);
+  running = [...runningJobs].length > 0 ? [...runningJobs].map(id => { const j = JOBS[id]; return j ? j.name : id; }).join(', ') : null;
   resetAbort();
   addLog(`=== ${job.name} 시작 ===`);
   try {
@@ -92,7 +113,11 @@ async function runTask(jobId) {
     notifier.notify({ title: '매칭 자동화', message: `${job.name} 에러: ${err.message}` });
     return { ok: false, message: err.message };
   } finally {
-    running = null;
+    runningJobs.delete(baseId);
+    running = runningJobs.size > 0 ? [...runningJobs].map(id => { const j = JOBS[id]; return j ? j.name : id; }).join(', ') : null;
+    // 큐에서 같은 종류 대기 중인 작업 하나 깨우기
+    const idx = taskQueue.findIndex(t => t.baseId === baseId);
+    if (idx >= 0) taskQueue.splice(idx, 1)[0].resolve();
     resetAbort();
   }
 }
@@ -242,7 +267,7 @@ app.get('/api/logs/files', (req, res) => {
 });
 
 app.get('/api/status', (req, res) => {
-  res.json({ running, mode: config.mode });
+  res.json({ running, runningJobs: [...runningJobs], queue: taskQueue.length, mode: config.mode });
 });
 
 // [디버그] 유저메모 시트의 status 분포 + 필터 결과
