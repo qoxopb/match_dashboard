@@ -1288,7 +1288,7 @@ async function sendProposal(page, rowIdx, tag, tutorId) {
     return 'systemError';
   }
 
-  // 모달 닫힘 확인
+  // 성공 판정: 모달 닫힘 OR 테이블에서 해당 튜터 상태가 "전송하기"가 아닌 값으로 변경
   const modalGone = await page.evaluate(() => {
     const modals = document.querySelectorAll('.ant-modal');
     return ![...modals].some(m => /매칭\s*제안.*할까요/i.test(m.innerText));
@@ -1297,11 +1297,35 @@ async function sendProposal(page, rowIdx, tag, tutorId) {
   if (modalGone) {
     console.log(`${tag} 튜터 ${tutorId} 매칭 제안 완료 (모달 닫힘 확인)`);
     return true;
-  } else {
-    console.log(`${tag} 튜터 ${tutorId} 모달 안 닫힘 → 제안 실패 가능성`);
-    await closeAllModals(page);
-    return false;
   }
+
+  // 모달 안 닫혔어도 실제 발송됐을 수 있음 → 테이블 상태 확인
+  await closeAllModals(page);
+  await page.waitForTimeout(1000);
+
+  const statusAfter = await page.evaluate((idx) => {
+    const tables = document.querySelectorAll('table');
+    let table = null;
+    for (const t of tables) {
+      const headers = [...t.querySelectorAll('thead th')].map(h => h.textContent.trim());
+      if (headers.some(h => /^timeline$/i.test(h))) { table = t; }
+    }
+    if (!table) return null;
+    const headers = [...table.querySelectorAll('thead th')].map(h => h.textContent.trim());
+    const talkIdx = headers.findIndex(h => /알림톡\s*전송/i.test(h));
+    if (talkIdx < 0) return null;
+    const rows = [...table.querySelectorAll('tbody tr')].filter(r => r.querySelectorAll('td').length > 1);
+    if (!rows[idx]) return null;
+    return rows[idx].querySelectorAll('td')[talkIdx]?.textContent?.trim() || null;
+  }, rowIdx);
+
+  if (statusAfter && !/전송하기/i.test(statusAfter)) {
+    console.log(`${tag} 튜터 ${tutorId} 매칭 제안 완료 (테이블 상태: "${statusAfter}")`);
+    return true;
+  }
+
+  console.log(`${tag} 튜터 ${tutorId} 제안 실패 (테이블 상태: "${statusAfter}")`);
+  return false;
 }
 
 // --- 특정 튜터풀 매칭 ---
