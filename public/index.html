@@ -953,6 +953,37 @@
       }
     }
 
+    // 컨테이너 블록 외부(헤더 등)에 드롭 → children에 추가
+    function showContainerDropIndicatorById(e, containerPath) {
+      const containerEl = e.currentTarget.querySelector('.wf-loop-children');
+      if (!containerEl) return;
+      removeDropIndicator();
+      const indicator = document.createElement('div');
+      indicator.className = 'wf-drop-indicator';
+      const adder = containerEl.querySelector('select')?.parentElement;
+      if (adder) containerEl.insertBefore(indicator, adder);
+      else containerEl.appendChild(indicator);
+    }
+
+    function dropOnContainerFromBlock(e, containerPath) {
+      e.preventDefault();
+      e.stopPropagation();
+      removeDropIndicator();
+      try {
+        const data = JSON.parse(e.dataTransfer.getData('application/json'));
+        const arr = getContainerArray(containerPath);
+        if (data.source === 'palette') {
+          arr.push({ kind: 'job', jobId: data.jobId, label: data.label, cat: data.cat });
+        } else if (data.source === 'workspace') {
+          if (pathStartsWith(containerPath, data.path)) return;
+          const block = removeBlockAt(data.path);
+          const targetArr = getContainerArray(containerPath);
+          targetArr.push(block);
+        }
+        renderWorkspace();
+      } catch {}
+    }
+
     function dropOnContainer(e, containerPath) {
       e.preventDefault();
       e.stopPropagation();
@@ -1078,7 +1109,9 @@
         ? '<div class="wf-empty-msg" style="color:rgba(255,255,255,.6);padding:10px;">자식 블럭을 추가하세요</div>'
         : b.children.map((c, i) => renderBlock(c, [...path, i])).join('');
       return `
-        <div class="wf-loop-block" draggable="true" ondragstart='dragStartWS(event, ${pathStr})'>
+        <div class="wf-loop-block" draggable="true" ondragstart='dragStartWS(event, ${pathStr})'
+             ondragover="event.preventDefault();event.stopPropagation();showContainerDropIndicatorById(event,${pathStr});"
+             ondrop="dropOnContainerFromBlock(event,${pathStr})">
           <div class="wf-loop-header">
             <span>${headerHTML}</span>
             <div class="wf-ws-actions">
@@ -1100,7 +1133,9 @@
         ? '<div class="wf-empty-msg" style="color:rgba(255,255,255,.6);padding:10px;">자식 블럭을 추가하세요</div>'
         : b.children.map((c, i) => renderBlock(c, [...path, i])).join('');
       return `
-        <div class="wf-cond-block" draggable="true" ondragstart='dragStartWS(event, ${pathStr})'>
+        <div class="wf-cond-block" draggable="true" ondragstart='dragStartWS(event, ${pathStr})'
+             ondragover="event.preventDefault();event.stopPropagation();showContainerDropIndicatorById(event,${pathStr});"
+             ondrop="dropOnContainerFromBlock(event,${pathStr})">
           <div class="wf-cond-header">
             <span>${headerHTML}</span>
             <div class="wf-ws-actions">
