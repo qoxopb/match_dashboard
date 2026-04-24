@@ -258,6 +258,7 @@
     .wf-block.cat-status { background: #ff9800; }
     .wf-block.cat-monthly { background: #ec407a; }
     .wf-block.cat-control { background: #607d8b; }
+    .wf-block.cat-memo { background: #26a69a; }
 
     /* 워크스페이스의 블럭 — 세로 스택 */
     .wf-workspace-list {
@@ -281,6 +282,7 @@
     .wf-ws-block.cat-status { background: #ff9800; }
     .wf-ws-block.cat-monthly { background: #ec407a; }
     .wf-ws-block.cat-control { background: #607d8b; }
+    .wf-ws-block.cat-memo { background: #26a69a; }
     .wf-ws-block .wf-ws-actions { display: flex; gap: 4px; }
     .wf-ws-block .wf-ws-actions button {
       background: rgba(0,0,0,.2); color: #fff; border: none;
@@ -517,6 +519,11 @@
 
                 <div class="wf-section-title">월별 관리</div>
                 <div class="wf-block cat-monthly" draggable="true" ondragstart="dragStart(event,'monthly','월별 탭 생성','monthly')" onclick="addBlock('monthly','월별 탭 생성','monthly')">월별 탭 생성</div>
+
+                <div class="wf-section-title">유저메모</div>
+                <div class="wf-block cat-memo" onclick="addUserMemoBlock('new')">신규 유저메모 편집</div>
+                <div class="wf-block cat-memo" onclick="addUserMemoBlock('rematch')">재매칭 유저메모 편집</div>
+                <div class="wf-block cat-memo" onclick="addUserMemoBlock('all')">전체 유저메모 편집</div>
 
                 <div class="wf-section-title">제어</div>
                 <div class="wf-block cat-control" onclick="addLoop()">반복 N회</div>
@@ -830,6 +837,12 @@
       renderWorkspace();
     }
 
+    function addUserMemoBlock(memoType) {
+      const labels = { new: '신규 유저메모 편집', rematch: '재매칭 유저메모 편집', all: '전체 유저메모 편집' };
+      wfWorkspace.push({ kind: 'userMemo', memoType, label: labels[memoType] || '유저메모 편집' });
+      renderWorkspace();
+    }
+
     // ===== Drag & Drop =====
     function dragStart(e, jobId, label, cat) {
       e.stopPropagation();
@@ -1104,6 +1117,16 @@
             </div>
           </div>
         `;
+      } else if (b.kind === 'userMemo') {
+        return `
+          <div class="wf-ws-block cat-memo" draggable="true" ondragstart='dragStartWS(event, ${pathStr})'
+               ondragover="event.preventDefault();event.stopPropagation();showDropIndicator(event);" ondrop="dropOnWorkspace(event)">
+            <span>${escapeHtml(b.label || '유저메모 편집')}</span>
+            <div class="wf-ws-actions">
+              <button title="삭제" onclick='removeBlock(${pathStr})'>×</button>
+            </div>
+          </div>
+        `;
       } else if (b.kind === 'loop') {
         return renderContainerBlock(b, path, pathStr,
           `반복 <input type="number" class="wf-loop-count" min="1" value="${b.count}" onchange='updateLoopCount(${pathStr}, this.value)'> 회`
@@ -1171,6 +1194,9 @@
             <option value='{"jobId":"statusCheck:rematch","label":"재매칭 결과 확인","cat":"status"}'>재매칭 결과 확인</option>
             <option value='{"jobId":"statusCheck","label":"전체 매칭결과 확인","cat":"status"}'>전체 매칭결과 확인</option>
             <option value='{"jobId":"monthly","label":"월별 탭 생성","cat":"monthly"}'>월별 탭 생성</option>
+            <option value='{"kind":"userMemo","memoType":"new"}'>신규 유저메모 편집</option>
+            <option value='{"kind":"userMemo","memoType":"rematch"}'>재매칭 유저메모 편집</option>
+            <option value='{"kind":"userMemo","memoType":"all"}'>전체 유저메모 편집</option>
             <option value='{"kind":"loop"}'>반복 N회</option>
             <option value='{"kind":"condLoop"}'>조건 반복</option>
           </select>
@@ -1192,7 +1218,10 @@
       let parent = wfWorkspace;
       for (let i = 0; i < loopPath.length - 1; i++) parent = parent[loopPath[i]].children;
       const container = parent[loopPath[loopPath.length - 1]];
-      if (block.kind === 'loop') {
+      if (block.kind === 'userMemo') {
+        const labels = { new: '신규 유저메모 편집', rematch: '재매칭 유저메모 편집', all: '전체 유저메모 편집' };
+        container.children.push({ kind: 'userMemo', memoType: block.memoType, label: labels[block.memoType] || '유저메모 편집' });
+      } else if (block.kind === 'loop') {
         container.children.push({ kind: 'loop', count: 2, children: [] });
       } else if (block.kind === 'condLoop') {
         container.children.push({ kind: 'condLoop', condType: 'new', condStatus: '', condOp: '<=', condValue: 0, maxIter: 5, children: [] });
@@ -1396,9 +1425,27 @@
       return false;
     }
 
+    function openMemoPopup(memoType, memoFilter) {
+      const filterParam = memoFilter === 'initial' ? '&filter=initial' : '';
+      const url = memoType === 'all'
+        ? `/userMemo.html?type=new${filterParam}&autoNext=true`
+        : `/userMemo.html?type=${memoType}${filterParam}`;
+      return window.open(url, '_blank');
+    }
+
     async function runBlocks(blocks) {
       for (const b of blocks) {
-        if (b.kind === 'job') {
+        if (b.kind === 'userMemo') {
+          wfLog(`유저메모 편집 대기 (${b.memoType || 'all'})`);
+          const popup = openMemoPopup(b.memoType || 'all', 'initial');
+          wfLog('유저메모 편집 팝업 열림 — 완료 대기 중');
+          await new Promise(resolve => {
+            const check = setInterval(() => {
+              if (popup.closed) { clearInterval(check); resolve(); }
+            }, 1000);
+          });
+          wfLog('유저메모 편집 완료', 'success');
+        } else if (b.kind === 'job') {
           await runOne(b.jobId);
         } else if (b.kind === 'loop') {
           wfLog(`반복 ${b.count}회 시작`);
@@ -1692,6 +1739,49 @@
     fetchSchedules();
     fetchLogs();
     setInterval(() => { fetchLogs(); fetchSchedules(); }, 3000);
+
+    // --- 워크플로 대기 작업 알림 (서버 스케줄 실행 시) ---
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+    let _wfPendingNotifyInterval = null;
+    let _wfPendingPopup = null;
+
+    function sendWfPendingNotification(data) {
+      if (Notification.permission !== 'granted') return;
+      const typeLabel = { new: '신규', rematch: '재매칭', all: '전체' }[data.type] || data.type;
+      const n = new Notification('유저메모 편집 필요', {
+        body: `${typeLabel} 유저메모 편집을 기다리고 있습니다.`,
+        requireInteraction: true,
+      });
+      n.onclick = () => {
+        n.close();
+        window.focus();
+        if (_wfPendingPopup && !_wfPendingPopup.closed) { _wfPendingPopup.focus(); return; }
+        _wfPendingPopup = openMemoPopup(data.type, data.filter || 'initial');
+        const check = setInterval(() => {
+          if (_wfPendingPopup.closed) {
+            clearInterval(check);
+            fetch('/api/wf/pending/complete', { method: 'POST' });
+            _wfPendingPopup = null;
+          }
+        }, 1000);
+      };
+    }
+
+    setInterval(async () => {
+      try {
+        const res = await fetch('/api/wf/pending');
+        const data = await res.json();
+        if (data.pending && !_wfPendingNotifyInterval) {
+          sendWfPendingNotification(data);
+          _wfPendingNotifyInterval = setInterval(() => sendWfPendingNotification(data), 60000);
+        } else if (!data.pending && _wfPendingNotifyInterval) {
+          clearInterval(_wfPendingNotifyInterval);
+          _wfPendingNotifyInterval = null;
+        }
+      } catch {}
+    }, 5000);
 
     // --- AIM 키워드 설정 모달 ---
     async function openAimKeywords() {

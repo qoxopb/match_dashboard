@@ -760,9 +760,37 @@ async function runWfBlocks(blocks) {
         console.log(`[워크플로] 조건 반복 ${r + 1}/${b.maxIter}`);
         await runWfBlocks(b.children || []);
       }
+    } else if (b.kind === 'userMemo') {
+      const memoType = b.memoType || 'all';
+      const memoFilter = b.memoFilter || 'initial';
+      console.log(`[워크플로] 유저메모 편집 대기 (${memoType})`);
+      wfPendingTask = { type: memoType, filter: memoFilter, createdAt: Date.now() };
+      await new Promise(resolve => { wfPendingTask.resolve = resolve; });
+      wfPendingTask = null;
+      console.log('[워크플로] 유저메모 편집 완료 → 다음 블록');
     }
   }
 }
+
+// --- 워크플로 대기 작업 ---
+let wfPendingTask = null;
+
+app.get('/api/wf/pending', (req, res) => {
+  if (wfPendingTask) {
+    res.json({ pending: true, type: wfPendingTask.type, filter: wfPendingTask.filter });
+  } else {
+    res.json({ pending: false });
+  }
+});
+
+app.post('/api/wf/pending/complete', (req, res) => {
+  if (wfPendingTask && wfPendingTask.resolve) {
+    wfPendingTask.resolve();
+    res.json({ ok: true });
+  } else {
+    res.json({ ok: false, message: '대기 중인 작업 없음' });
+  }
+});
 
 async function countSheetStatus(type, condStatus) {
   const sheets = await getSheetsApi();
