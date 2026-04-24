@@ -764,30 +764,41 @@ async function runWfBlocks(blocks) {
   }
 }
 
+async function countSheetStatus(type, condStatus) {
+  const sheets = await getSheetsApi();
+  const spreadsheetId = config.sheets[type === 'new' ? 'new' : 'rematch'];
+  const now = new Date();
+  const yy = String(now.getFullYear()).slice(2);
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const tabName = type === 'new' ? `[신규] ${yy}.${mm}` : `[재매칭] ${yy}.${mm}`;
+  const headerRes = await sheets.spreadsheets.values.get({ spreadsheetId, range: `'${tabName}'!A1:BZ1` });
+  const header = (headerRes.data.values || [])[0] || [];
+  const norm = s => (s || '').replace(/\s+/g, '').toLowerCase();
+  const matchIdIdx = header.findIndex(h => norm(h) === norm(type === 'new' ? 'match_id' : 'match ID'));
+  const statusIdx = header.findIndex(h => norm(h) === norm(type === 'new' ? '매칭상태' : 'status'));
+  const dataRes = await sheets.spreadsheets.values.get({ spreadsheetId, range: `'${tabName}'!A2:BZ` });
+  const rows = dataRes.data.values || [];
+  const targetNorm = norm(condStatus || '');
+  let count = 0;
+  rows.forEach(row => {
+    const matchId = matchIdIdx >= 0 ? (row[matchIdIdx] || '').trim() : '';
+    if (!matchId) return;
+    const status = statusIdx >= 0 ? (row[statusIdx] || '').trim() : '';
+    if (norm(status) === targetNorm) count++;
+  });
+  return count;
+}
+
 async function checkWfCondition(cond) {
   try {
     const type = cond.condType || 'new';
-    const sheets = await getSheetsApi();
-    const spreadsheetId = config.sheets[type === 'new' ? 'new' : 'rematch'];
-    const now = new Date();
-    const yy = String(now.getFullYear()).slice(2);
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
-    const tabName = type === 'new' ? `[신규] ${yy}.${mm}` : `[재매칭] ${yy}.${mm}`;
-    const headerRes = await sheets.spreadsheets.values.get({ spreadsheetId, range: `'${tabName}'!A1:BZ1` });
-    const header = (headerRes.data.values || [])[0] || [];
-    const norm = s => (s || '').replace(/\s+/g, '').toLowerCase();
-    const matchIdIdx = header.findIndex(h => norm(h) === norm(type === 'new' ? 'match_id' : 'match ID'));
-    const statusIdx = header.findIndex(h => norm(h) === norm(type === 'new' ? '매칭상태' : 'status'));
-    const dataRes = await sheets.spreadsheets.values.get({ spreadsheetId, range: `'${tabName}'!A2:BZ` });
-    const rows = dataRes.data.values || [];
-    const targetNorm = norm(cond.condStatus || '');
-    let count = 0;
-    rows.forEach(row => {
-      const matchId = matchIdIdx >= 0 ? (row[matchIdIdx] || '').trim() : '';
-      if (!matchId) return;
-      const status = statusIdx >= 0 ? (row[statusIdx] || '').trim() : '';
-      if (norm(status) === targetNorm) count++;
-    });
+    let count;
+    if (type === 'both') {
+      const [n, r] = await Promise.all([countSheetStatus('new', cond.condStatus), countSheetStatus('rematch', cond.condStatus)]);
+      count = n + r;
+    } else {
+      count = await countSheetStatus(type, cond.condStatus);
+    }
     const op = cond.condOp || '<=';
     const val = parseInt(cond.condValue) || 0;
     if (op === '<=') return count <= val;

@@ -1100,7 +1100,7 @@
           `반복 <input type="number" class="wf-loop-count" min="1" value="${b.count}" onchange='updateLoopCount(${pathStr}, this.value)'> 회`
         );
       } else if (b.kind === 'condLoop') {
-        const condUI = `<div class="wf-cond-row">조건: <select onchange='updateCondField(${pathStr},"condType",this.value)'><option value="new" ${b.condType==='new'?'selected':''}>신규</option><option value="rematch" ${b.condType==='rematch'?'selected':''}>재매칭</option></select> <select onchange='updateCondField(${pathStr},"condStatus",this.value)'><option value="" ${b.condStatus===''?'selected':''}>미처리</option><option value="매칭중" ${b.condStatus==='매칭중'?'selected':''}>매칭중</option><option value="확인 필요" ${b.condStatus==='확인 필요'?'selected':''}>확인 필요</option><option value="보류" ${b.condStatus==='보류'?'selected':''}>보류</option><option value="첫수업전재매칭" ${b.condStatus==='첫수업전재매칭'?'selected':''}>첫수업전재매칭</option><option value="일반 재매칭" ${b.condStatus==='일반 재매칭'?'selected':''}>일반 재매칭</option></select></div><div class="wf-cond-row">건수 <select onchange='updateCondField(${pathStr},"condOp",this.value)'><option value="<=" ${b.condOp==='<='?'selected':''}>≤</option><option value=">=" ${b.condOp==='>='?'selected':''}>≥</option><option value="=" ${b.condOp==='='?'selected':''}>=</option></select> <input type="number" min="0" value="${b.condValue}" style="width:50px" onchange='updateCondField(${pathStr},"condValue",this.value)'> 까지 (최대 <input type="number" min="1" value="${b.maxIter}" style="width:40px" onchange='updateCondField(${pathStr},"maxIter",this.value)'>회)</div>`;
+        const condUI = `<div class="wf-cond-row">조건: <select onchange='updateCondField(${pathStr},"condType",this.value)'><option value="new" ${b.condType==='new'?'selected':''}>신규</option><option value="rematch" ${b.condType==='rematch'?'selected':''}>재매칭</option><option value="both" ${b.condType==='both'?'selected':''}>전체</option></select> <select onchange='updateCondField(${pathStr},"condStatus",this.value)'><option value="" ${b.condStatus===''?'selected':''}>미처리</option><option value="매칭중" ${b.condStatus==='매칭중'?'selected':''}>매칭중</option><option value="확인 필요" ${b.condStatus==='확인 필요'?'selected':''}>확인 필요</option><option value="보류" ${b.condStatus==='보류'?'selected':''}>보류</option><option value="첫수업전재매칭" ${b.condStatus==='첫수업전재매칭'?'selected':''}>첫수업전재매칭</option><option value="일반 재매칭" ${b.condStatus==='일반 재매칭'?'selected':''}>일반 재매칭</option></select></div><div class="wf-cond-row">건수 <select onchange='updateCondField(${pathStr},"condOp",this.value)'><option value="<=" ${b.condOp==='<='?'selected':''}>≤</option><option value=">=" ${b.condOp==='>='?'selected':''}>≥</option><option value="=" ${b.condOp==='='?'selected':''}>=</option></select> <input type="number" min="0" value="${b.condValue}" style="width:50px" onchange='updateCondField(${pathStr},"condValue",this.value)'> 까지 (최대 <input type="number" min="1" value="${b.maxIter}" style="width:40px" onchange='updateCondField(${pathStr},"maxIter",this.value)'>회)</div>`;
         return renderCondContainer(b, path, pathStr, condUI);
       }
       return '';
@@ -1352,10 +1352,18 @@
 
     async function checkCondition(cond) {
       try {
-        const url = `/api/wf/count?type=${cond.condType}&status=${encodeURIComponent(cond.condStatus)}`;
-        const res = await fetch(url);
-        const data = await res.json();
-        const cnt = data.count || 0;
+        let cnt = 0;
+        if (cond.condType === 'both') {
+          const [r1, r2] = await Promise.all([
+            fetch(`/api/wf/count?type=new&status=${encodeURIComponent(cond.condStatus)}`).then(r => r.json()),
+            fetch(`/api/wf/count?type=rematch&status=${encodeURIComponent(cond.condStatus)}`).then(r => r.json()),
+          ]);
+          cnt = (r1.count || 0) + (r2.count || 0);
+        } else {
+          const res = await fetch(`/api/wf/count?type=${cond.condType}&status=${encodeURIComponent(cond.condStatus)}`);
+          const data = await res.json();
+          cnt = data.count || 0;
+        }
         if (cond.condOp === '<=') return cnt <= cond.condValue;
         if (cond.condOp === '>=') return cnt >= cond.condValue;
         if (cond.condOp === '=') return cnt === cond.condValue;
