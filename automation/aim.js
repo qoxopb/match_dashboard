@@ -795,18 +795,25 @@ async function tryManualMatch(page, tag, studentSchedule, weekly, hoursNeeded, i
 
 // --- 검색 결과 순회: 전송하기 우선 → sms 전송됨 (최대 2명) ---
 const MAX_PROPOSALS_PER_STUDENT = 2;
+const MAX_SEND_ATTEMPTS = 10; // 전송 시도 상한 (실패 포함)
 
 async function iterateSearchResults(page, tag, studentSchedule, weekly, hoursNeeded, genderFilter) {
   let sentCount = 0;
+  let totalAttempts = 0;
   for (const targetStatus of ['전송하기', 'sms 전송됨']) {
     let pageNum = 1;
     while (true) {
       const result = await tryMatchOnPage(page, tag, studentSchedule, weekly, hoursNeeded, targetStatus, MAX_PROPOSALS_PER_STUDENT - sentCount, genderFilter);
       if (result.systemError) return 'systemError';
       sentCount += result.sent;
+      totalAttempts += result.attempts || 0;
       if (sentCount >= MAX_PROPOSALS_PER_STUDENT) {
         console.log(`${tag} 최대 ${MAX_PROPOSALS_PER_STUDENT}명 제안 완료`);
         return 'matched';
+      }
+      if (totalAttempts >= MAX_SEND_ATTEMPTS) {
+        console.log(`${tag} 전송 시도 ${totalAttempts}회 도달 → 중단`);
+        return sentCount > 0 ? 'matched' : 'noMatch';
       }
 
       // 다음 페이지
@@ -858,6 +865,7 @@ function getSearchTableScript() {
 // --- 현재 페이지에서 시간 매칭 시도 ---
 async function tryMatchOnPage(page, tag, studentSchedule, weekly, hoursNeeded, targetStatus, maxSend, genderFilter) {
   let sent = 0;
+  let attempts = 0;
   // 검색 결과 테이블에서 해당 상태의 행 + 튜터ID + 성별 수집
   const candidates = await page.evaluate((status) => {
     const tables = document.querySelectorAll('table');
@@ -931,13 +939,14 @@ async function tryMatchOnPage(page, tag, studentSchedule, weekly, hoursNeeded, t
       await closeAllModals(page);
 
       // 알림톡 전송
+      attempts++;
       const didSend = await sendProposal(page, rowIdx, tag, tutorId);
       if (didSend === 'systemError') {
-        return { sent, systemError: true };
+        return { sent, attempts, systemError: true };
       }
       if (didSend === true) {
         sent++;
-        if (sent >= maxSend) return { sent };
+        if (sent >= maxSend) return { sent, attempts };
         continue;
       }
       console.log(`${tag} 전송 실패 → 다음 선생님`);
@@ -949,7 +958,7 @@ async function tryMatchOnPage(page, tag, studentSchedule, weekly, hoursNeeded, t
     }
   }
 
-  return { sent };
+  return { sent, attempts };
 }
 
 // --- timeline 클릭 → 선생님 시간표 파싱 ---
