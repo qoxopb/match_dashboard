@@ -175,6 +175,13 @@ function addSchedule(jobId, type, options) {
 
   schedules[id] = { id, jobId, jobName: job.name, type, label, cronExpr, enabled: true, cronTask };
   console.log(`[스케줄] 등록: ${job.name} — ${label}`);
+
+  // 주기 타입은 등록 즉시 1회 실행
+  if (type === 'interval') {
+    console.log(`[스케줄] ${job.name} 즉시 실행`);
+    runTask(jobId);
+  }
+
   return id;
 }
 
