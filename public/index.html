@@ -483,7 +483,7 @@
       <section class="view" id="view-workflow">
         <h1>워크플로</h1>
 
-        <div style="display:grid;grid-template-columns:1fr 200px 240px;gap:16px;">
+        <div style="display:grid;grid-template-columns:1fr 260px 280px;gap:16px;">
           <!-- 왼쪽: 설정 바 + 팔레트 + 워크스페이스 -->
           <div>
             <!-- 설정 바 -->
@@ -1218,20 +1218,59 @@
       localStorage.setItem(WF_INDEX_KEY, JSON.stringify(wfPresets));
     }
 
+    function countBlocks(blocks) {
+      let n = 0;
+      for (const b of blocks) {
+        n++;
+        if (b.children) n += countBlocks(b.children);
+      }
+      return n;
+    }
+
+    function describeBlocks(blocks) {
+      if (!blocks || blocks.length === 0) return '';
+      const labels = blocks.map(b => {
+        if (b.kind === 'job') return b.label || b.jobId;
+        if (b.kind === 'loop') return `반복${b.count}회`;
+        if (b.kind === 'condLoop') return '조건반복';
+        return '';
+      });
+      const text = labels.join(' → ');
+      return text.length > 40 ? text.substring(0, 38) + '...' : text;
+    }
+
+    // 스케줄 캐시 (프리셋 목록 표시용)
+    let _wfSchedCache = [];
+    async function refreshWfSchedCache() {
+      try {
+        const res = await fetch('/api/schedules');
+        _wfSchedCache = await res.json();
+      } catch { _wfSchedCache = []; }
+    }
+
+    function getPresetScheduleDesc(presetId) {
+      const items = _wfSchedCache.filter(s => s.jobId === 'wf:' + presetId && s.enabled);
+      if (items.length === 0) return '';
+      return items.map(s => s.label).join(', ');
+    }
+
     function renderPresetList() {
       const list = document.getElementById('wf-preset-list');
       list.innerHTML = wfPresets.map(p => {
-        const blockCount = (() => {
-          try {
-            const d = JSON.parse(localStorage.getItem(WF_DATA_PREFIX + p.id) || '{}');
-            return (d.workspace || []).length;
-          } catch { return 0; }
-        })();
+        let blocks = [];
+        try {
+          const d = JSON.parse(localStorage.getItem(WF_DATA_PREFIX + p.id) || '{}');
+          blocks = d.workspace || [];
+        } catch {}
+        const total = countBlocks(blocks);
+        const desc = describeBlocks(blocks);
+        const schedDesc = getPresetScheduleDesc(p.id);
         return `
           <div class="wf-preset-item ${p.id === wfCurrentId ? 'active' : ''}" onclick="selectPreset('${p.id}')">
             <div style="flex:1;min-width:0;">
               <div class="wf-preset-name">${escapeHtml(p.name)}</div>
-              <div class="wf-preset-meta">${blockCount}개 블럭</div>
+              ${desc ? `<div class="wf-preset-meta" style="color:#666;">${escapeHtml(desc)}</div>` : ''}
+              <div class="wf-preset-meta">${total}개 블럭${schedDesc ? ` · ${escapeHtml(schedDesc)}` : ''}</div>
             </div>
             <button class="wf-preset-del" onclick="event.stopPropagation();deletePreset('${p.id}')" title="삭제">×</button>
           </div>
@@ -1410,7 +1449,9 @@
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ jobId: 'wf:' + wfCurrentId, type: 'interval', options: { minutes: wfSelectedInterval } }),
       });
+      await refreshWfSchedCache();
       renderWfSchedules();
+      renderPresetList();
     }
 
     async function addWfAlarm() {
@@ -1423,7 +1464,9 @@
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ jobId: 'wf:' + wfCurrentId, type: 'alarm', options: { hour: hh, minute: mm, days } }),
       });
+      await refreshWfSchedCache();
       renderWfSchedules();
+      renderPresetList();
     }
 
     async function renderWfSchedules() {
@@ -1464,8 +1507,10 @@
 
     // 초기 로드
     loadPresetIndex();
-    if (wfPresets.length > 0) selectPreset(wfPresets[0].id);
-    else renderPresetList();
+    refreshWfSchedCache().then(() => {
+      if (wfPresets.length > 0) selectPreset(wfPresets[0].id);
+      else renderPresetList();
+    });
 
     // --- 유저메모 필터 토글 ---
     let memoFilter = 'initial';
