@@ -1240,18 +1240,6 @@
       return n;
     }
 
-    function describeBlocks(blocks) {
-      if (!blocks || blocks.length === 0) return '';
-      const labels = blocks.map(b => {
-        if (b.kind === 'job') return b.label || b.jobId;
-        if (b.kind === 'loop') return `반복${b.count}회`;
-        if (b.kind === 'condLoop') return '조건반복';
-        return '';
-      });
-      const text = labels.join(' → ');
-      return text.length > 40 ? text.substring(0, 38) + '...' : text;
-    }
-
     // 스케줄 캐시 (프리셋 목록 표시용)
     let _wfSchedCache = [];
     async function refreshWfSchedCache() {
@@ -1259,12 +1247,6 @@
         const res = await fetch('/api/schedules');
         _wfSchedCache = await res.json();
       } catch { _wfSchedCache = []; }
-    }
-
-    function getPresetScheduleDesc(presetId) {
-      const items = _wfSchedCache.filter(s => s.jobId === 'wf:' + presetId && s.enabled);
-      if (items.length === 0) return '';
-      return items.map(s => s.label).join(', ');
     }
 
     function renderPresetList() {
@@ -1276,14 +1258,16 @@
           blocks = d.workspace || [];
         } catch {}
         const total = countBlocks(blocks);
-        const desc = describeBlocks(blocks);
-        const schedDesc = getPresetScheduleDesc(p.id);
+        const scheds = _wfSchedCache.filter(s => s.jobId === 'wf:' + p.id && s.enabled);
+        let metaText = '';
+        if (scheds.length === 1) metaText = `${scheds[0].label} · 블록 ${total}개`;
+        else if (scheds.length > 1) metaText = `스케줄 ${scheds.length}개 · 블록 ${total}개`;
+        else metaText = `블록 ${total}개`;
         return `
           <div class="wf-preset-item ${p.id === wfCurrentId ? 'active' : ''}" onclick="selectPreset('${p.id}')">
             <div style="flex:1;min-width:0;">
               <div class="wf-preset-name">${escapeHtml(p.name)}</div>
-              ${desc ? `<div class="wf-preset-meta" style="color:#666;">${escapeHtml(desc)}</div>` : ''}
-              <div class="wf-preset-meta">${total}개 블럭${schedDesc ? ` · ${escapeHtml(schedDesc)}` : ''}</div>
+              <div class="wf-preset-meta">${escapeHtml(metaText)}</div>
             </div>
             <button class="wf-preset-del" onclick="event.stopPropagation();deletePreset('${p.id}')" title="삭제">×</button>
           </div>
