@@ -854,22 +854,23 @@
       renderWorkspace();
     }
 
-    function getDropIndex(e, container) {
-      const list = e.currentTarget;
+    function getDropIndex(e) {
+      const list = document.getElementById('wf-ws-list');
       const blocks = [...list.children].filter(c => !c.classList.contains('wf-empty-msg'));
       for (let i = 0; i < blocks.length; i++) {
         const rect = blocks[i].getBoundingClientRect();
         if (e.clientY < rect.top + rect.height / 2) return i;
       }
-      return container.length;
+      return wfWorkspace.length;
     }
 
     function dropOnWorkspace(e) {
       e.preventDefault();
-      e.currentTarget.classList.remove('drag-over');
+      e.stopPropagation();
+      document.getElementById('wf-ws-list').classList.remove('drag-over');
       try {
         const data = JSON.parse(e.dataTransfer.getData('application/json'));
-        const dropIdx = getDropIndex(e, wfWorkspace);
+        const dropIdx = getDropIndex(e);
         if (data.source === 'palette') {
           wfWorkspace.splice(dropIdx, 0, { kind: 'job', jobId: data.jobId, label: data.label, cat: data.cat });
         } else if (data.source === 'workspace') {
@@ -948,7 +949,8 @@
       const pathStr = JSON.stringify(path);
       if (b.kind === 'job') {
         return `
-          <div class="wf-ws-block cat-${b.cat}" draggable="true" ondragstart='dragStartWS(event, ${pathStr})'>
+          <div class="wf-ws-block cat-${b.cat}" draggable="true" ondragstart='dragStartWS(event, ${pathStr})'
+               ondragover="event.preventDefault();event.stopPropagation();" ondrop="dropOnWorkspace(event)">
             <span>${escapeHtml(b.label)}</span>
             <div class="wf-ws-actions">
               <button title="위로" onclick='moveBlock(${pathStr}, -1)'>↑</button>
