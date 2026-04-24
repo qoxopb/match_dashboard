@@ -1424,12 +1424,14 @@
     }
     function clearWfLog() { const box = document.getElementById('wf-log-box'); if (box) box.innerHTML = ''; }
 
-    async function runOne(jobId) {
-      wfLog(`${jobId} 실행 중...`);
+    async function runOne(labelOrId) {
+      wfLog(`▶ ${labelOrId} 시작`);
+      // labelOrId가 label이면 jobId를 찾아야 함 — 하지만 runBlocks에서 jobId도 같이 넘김
+      const jobId = arguments[1] || labelOrId;
       const res = await fetch(`/api/run/${jobId}`, { method: 'POST' });
       const data = await res.json();
-      if (data.ok) wfLog(`${jobId} — ${data.message}`, 'success');
-      else wfLog(`${jobId} — ${data.message}`, 'error');
+      if (data.ok) wfLog(`✓ ${labelOrId} — ${data.message}`, 'success');
+      else wfLog(`✗ ${labelOrId} — ${data.message}`, 'error');
       await new Promise(r => setTimeout(r, 800));
     }
 
@@ -1465,7 +1467,7 @@
     async function runBlocks(blocks) {
       for (const b of blocks) {
         if (b.kind === 'userMemo') {
-          wfLog(`유저메모 편집 대기 (${b.memoType || 'all'})`);
+          wfLog(`▶ ${b.label || '유저메모 편집'} 시작`);
           const popup = openMemoPopup(b.memoType || 'all', 'initial');
           wfLog('유저메모 편집 팝업 열림 — 완료 대기 중');
           await new Promise(resolve => {
@@ -1473,9 +1475,9 @@
               if (popup.closed) { clearInterval(check); resolve(); }
             }, 1000);
           });
-          wfLog('유저메모 편집 완료', 'success');
+          wfLog(`✓ ${b.label || '유저메모 편집'} 완료`, 'success');
         } else if (b.kind === 'job') {
-          await runOne(b.jobId);
+          await runOne(b.label || b.jobId, b.jobId);
         } else if (b.kind === 'loop') {
           wfLog(`반복 ${b.count}회 시작`);
           for (let r = 0; r < b.count; r++) {
