@@ -518,15 +518,18 @@
             </div>
           </div>
 
-          <!-- 오른쪽: 프리셋 목록 + 스케줄 -->
-          <div class="wf-presets" style="max-height:calc(100vh - 120px);align-self:start;">
-            <div class="wf-section-title">프리셋</div>
-            <div id="wf-preset-list"></div>
-            <button class="wf-add-preset" onclick="addPreset()">+ 새 프리셋</button>
+          <!-- 오른쪽: 프리셋 목록 + 스케줄 (2단 세로) -->
+          <div style="display:flex;flex-direction:column;gap:16px;align-self:start;">
+            <!-- 프리셋 목록 -->
+            <div class="wf-presets" style="max-height:300px;">
+              <div class="wf-section-title">프리셋</div>
+              <div id="wf-preset-list"></div>
+              <button class="wf-add-preset" onclick="addPreset()">+ 새 프리셋</button>
+            </div>
 
-            <!-- 프리셋 스케줄 설정 -->
-            <div id="wf-sched-section" style="display:none;margin-top:16px;border-top:1px solid #e0e0e0;padding-top:12px;">
-              <div class="wf-section-title">스케줄 설정</div>
+            <!-- 스케줄 설정 (별도 섹션) -->
+            <div id="wf-sched-section" class="wf-presets" style="display:none;">
+              <div class="wf-section-title">스케줄 설정 — <span id="wf-sched-preset-name" style="color:#1976d2;"></span></div>
               <div style="margin-bottom:8px;">
                 <div style="display:flex;gap:0;margin-bottom:8px;border-bottom:2px solid #e0e0e0;">
                   <div class="wf-sched-tab active" data-tab="interval" onclick="switchWfSchedTab('interval')" style="padding:6px 12px;font-size:12px;color:#999;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;">주기</div>
@@ -1344,6 +1347,8 @@
     function showWfSchedule() {
       const section = document.getElementById('wf-sched-section');
       if (wfCurrentId) {
+        const preset = wfPresets.find(p => p.id === wfCurrentId);
+        document.getElementById('wf-sched-preset-name').textContent = preset ? preset.name : '';
         section.style.display = '';
         initWfSchedUI();
         renderWfSchedules();
