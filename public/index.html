@@ -257,6 +257,11 @@
       padding: 12px; background: #fafafa; border: 2px dashed #ddd; border-radius: 8px;
     }
     .wf-workspace-list.drag-over { background: #e3f2fd; border-color: #1976d2; }
+    .wf-drop-indicator {
+      height: 3px; background: #1976d2; border-radius: 2px;
+      margin: -2px 0; position: relative; z-index: 10;
+      box-shadow: 0 0 4px rgba(25,118,210,.5);
+    }
     .wf-ws-block {
       display: flex; align-items: center; justify-content: space-between;
       gap: 8px; padding: 10px 14px; border-radius: 6px; font-size: 13px; font-weight: 500;
@@ -810,11 +815,35 @@
       e.stopPropagation();
       e.dataTransfer.dropEffect = 'move';
       e.currentTarget.classList.add('drag-over');
+      showDropIndicator(e);
     }
     function dragLeave(e) {
       if (!e.currentTarget.contains(e.relatedTarget)) {
         e.currentTarget.classList.remove('drag-over');
+        removeDropIndicator();
       }
+    }
+
+    function showDropIndicator(e) {
+      removeDropIndicator();
+      const list = document.getElementById('wf-ws-list');
+      const blocks = [...list.children].filter(c => !c.classList.contains('wf-empty-msg') && !c.classList.contains('wf-drop-indicator'));
+      const indicator = document.createElement('div');
+      indicator.className = 'wf-drop-indicator';
+      let inserted = false;
+      for (let i = 0; i < blocks.length; i++) {
+        const rect = blocks[i].getBoundingClientRect();
+        if (e.clientY < rect.top + rect.height / 2) {
+          list.insertBefore(indicator, blocks[i]);
+          inserted = true;
+          break;
+        }
+      }
+      if (!inserted) list.appendChild(indicator);
+    }
+
+    function removeDropIndicator() {
+      document.querySelectorAll('.wf-drop-indicator').forEach(el => el.remove());
     }
 
     // path 비교
@@ -854,7 +883,7 @@
 
     function getDropIndex(e) {
       const list = document.getElementById('wf-ws-list');
-      const blocks = [...list.children].filter(c => !c.classList.contains('wf-empty-msg'));
+      const blocks = [...list.children].filter(c => !c.classList.contains('wf-empty-msg') && !c.classList.contains('wf-drop-indicator'));
       for (let i = 0; i < blocks.length; i++) {
         const rect = blocks[i].getBoundingClientRect();
         if (e.clientY < rect.top + rect.height / 2) return i;
@@ -865,6 +894,7 @@
     function dropOnWorkspace(e) {
       e.preventDefault();
       e.stopPropagation();
+      removeDropIndicator();
       document.getElementById('wf-ws-list').classList.remove('drag-over');
       try {
         const data = JSON.parse(e.dataTransfer.getData('application/json'));
@@ -948,7 +978,7 @@
       if (b.kind === 'job') {
         return `
           <div class="wf-ws-block cat-${b.cat}" draggable="true" ondragstart='dragStartWS(event, ${pathStr})'
-               ondragover="event.preventDefault();event.stopPropagation();" ondrop="dropOnWorkspace(event)">
+               ondragover="event.preventDefault();event.stopPropagation();showDropIndicator(event);" ondrop="dropOnWorkspace(event)">
             <span>${escapeHtml(b.label)}</span>
             <div class="wf-ws-actions">
               <button title="위로" onclick='moveBlock(${pathStr}, -1)'>↑</button>
