@@ -223,10 +223,14 @@
       color: #fff; padding: 3px 6px; border-radius: 4px; font-size: 12px;
     }
     .wf-cond-header select option { color: #333; }
-    .wf-cond-header .wf-ws-actions { margin-left: auto; flex-shrink: 0; }
-    .wf-cond-header .wf-ws-actions button {
+    .wf-cond-block, .wf-loop-block { position: relative; }
+    .wf-cond-block > .wf-ws-del, .wf-loop-block > .wf-ws-del {
+      position: absolute; top: 8px; right: 8px;
+      background: rgba(0,0,0,.2); color: #fff; border: none;
+      width: 24px; height: 24px; border-radius: 4px; font-size: 14px; cursor: pointer;
       display: flex; align-items: center; justify-content: center; line-height: 1;
     }
+    .wf-cond-block > .wf-ws-del:hover, .wf-loop-block > .wf-ws-del:hover { background: rgba(0,0,0,.35); }
     .wf-palette, .wf-workspace {
       background: #fff; border-radius: 10px; padding: 16px;
       box-shadow: 0 1px 4px rgba(0,0,0,.08);
@@ -1097,11 +1101,9 @@
         <div class="wf-loop-block" draggable="true" ondragstart='dragStartWS(event, ${pathStr})'
              data-container-path='${pathStr}'
              ondragover="containerDragOver(event)" ondrop="containerDrop(event)">
+          <button class="wf-ws-del" title="삭제" onclick='removeBlock(${pathStr})'>×</button>
           <div class="wf-loop-header">
             <span>${headerHTML}</span>
-            <div class="wf-ws-actions">
-              <button title="삭제" onclick='removeBlock(${pathStr})'>×</button>
-            </div>
           </div>
           <div class="wf-loop-children" ondragover="event.preventDefault();event.stopPropagation();showContainerDropIndicator(event);" ondragleave="if(!event.currentTarget.contains(event.relatedTarget)){removeDropIndicator();}" ondrop="dropOnContainer(event, ${pathStr})">
             ${childrenHtml}
@@ -1119,11 +1121,9 @@
         <div class="wf-cond-block" draggable="true" ondragstart='dragStartWS(event, ${pathStr})'
              data-container-path='${pathStr}'
              ondragover="containerDragOver(event)" ondrop="containerDrop(event)">
+          <button class="wf-ws-del" title="삭제" onclick='removeBlock(${pathStr})'>×</button>
           <div class="wf-cond-header">
             <span>${headerHTML}</span>
-            <div class="wf-ws-actions">
-              <button title="삭제" onclick='removeBlock(${pathStr})'>×</button>
-            </div>
           </div>
           <div class="wf-loop-children" ondragover="event.preventDefault();event.stopPropagation();showContainerDropIndicator(event);" ondragleave="if(!event.currentTarget.contains(event.relatedTarget)){removeDropIndicator();}" ondrop="dropOnContainer(event, ${pathStr})">
             ${childrenHtml}
