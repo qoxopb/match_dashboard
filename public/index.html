@@ -214,15 +214,19 @@
       box-shadow: 0 2px 0 rgba(0,0,0,.15);
     }
     .wf-cond-header {
-      padding: 10px 14px; display: flex; flex-wrap: nowrap; align-items: center;
-      gap: 6px; font-size: 12px; font-weight: 500; white-space: nowrap;
+      padding: 10px 14px; font-size: 12px; font-weight: 500;
     }
+    .wf-cond-row { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+    .wf-cond-row + .wf-cond-row { margin-top: 6px; }
     .wf-cond-header select, .wf-cond-header input {
       background: rgba(255,255,255,.2); border: 1px solid rgba(255,255,255,.3);
       color: #fff; padding: 3px 6px; border-radius: 4px; font-size: 12px;
     }
     .wf-cond-header select option { color: #333; }
-    .wf-cond-header .wf-ws-actions { margin-left: auto; }
+    .wf-cond-header .wf-ws-actions { margin-left: auto; flex-shrink: 0; }
+    .wf-cond-header .wf-ws-actions button {
+      display: flex; align-items: center; justify-content: center; line-height: 1;
+    }
     .wf-palette, .wf-workspace {
       background: #fff; border-radius: 10px; padding: 16px;
       box-shadow: 0 1px 4px rgba(0,0,0,.08);
@@ -276,7 +280,8 @@
     .wf-ws-block .wf-ws-actions { display: flex; gap: 4px; }
     .wf-ws-block .wf-ws-actions button {
       background: rgba(0,0,0,.2); color: #fff; border: none;
-      width: 24px; height: 24px; border-radius: 4px; font-size: 13px; cursor: pointer;
+      width: 24px; height: 24px; border-radius: 4px; font-size: 14px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; line-height: 1;
     }
     .wf-ws-block .wf-ws-actions button:hover { background: rgba(0,0,0,.35); }
 
@@ -1078,7 +1083,7 @@
           `반복 <input type="number" class="wf-loop-count" min="1" value="${b.count}" onchange='updateLoopCount(${pathStr}, this.value)'> 회`
         );
       } else if (b.kind === 'condLoop') {
-        const condUI = `조건: <select onchange='updateCondField(${pathStr},"condType",this.value)'><option value="new" ${b.condType==='new'?'selected':''}>신규</option><option value="rematch" ${b.condType==='rematch'?'selected':''}>재매칭</option></select> <select onchange='updateCondField(${pathStr},"condStatus",this.value)'><option value="" ${b.condStatus===''?'selected':''}>미처리</option><option value="매칭중" ${b.condStatus==='매칭중'?'selected':''}>매칭중</option><option value="확인 필요" ${b.condStatus==='확인 필요'?'selected':''}>확인 필요</option><option value="보류" ${b.condStatus==='보류'?'selected':''}>보류</option><option value="첫수업전재매칭" ${b.condStatus==='첫수업전재매칭'?'selected':''}>첫수업전재매칭</option><option value="일반 재매칭" ${b.condStatus==='일반 재매칭'?'selected':''}>일반 재매칭</option></select> 건수 <select onchange='updateCondField(${pathStr},"condOp",this.value)'><option value="<=" ${b.condOp==='<='?'selected':''}>≤</option><option value=">=" ${b.condOp==='>='?'selected':''}>≥</option><option value="=" ${b.condOp==='='?'selected':''}>=</option></select> <input type="number" min="0" value="${b.condValue}" style="width:50px" onchange='updateCondField(${pathStr},"condValue",this.value)'> 까지 (최대 <input type="number" min="1" value="${b.maxIter}" style="width:40px" onchange='updateCondField(${pathStr},"maxIter",this.value)'>회)`;
+        const condUI = `<div class="wf-cond-row">조건: <select onchange='updateCondField(${pathStr},"condType",this.value)'><option value="new" ${b.condType==='new'?'selected':''}>신규</option><option value="rematch" ${b.condType==='rematch'?'selected':''}>재매칭</option></select> <select onchange='updateCondField(${pathStr},"condStatus",this.value)'><option value="" ${b.condStatus===''?'selected':''}>미처리</option><option value="매칭중" ${b.condStatus==='매칭중'?'selected':''}>매칭중</option><option value="확인 필요" ${b.condStatus==='확인 필요'?'selected':''}>확인 필요</option><option value="보류" ${b.condStatus==='보류'?'selected':''}>보류</option><option value="첫수업전재매칭" ${b.condStatus==='첫수업전재매칭'?'selected':''}>첫수업전재매칭</option><option value="일반 재매칭" ${b.condStatus==='일반 재매칭'?'selected':''}>일반 재매칭</option></select></div><div class="wf-cond-row">건수 <select onchange='updateCondField(${pathStr},"condOp",this.value)'><option value="<=" ${b.condOp==='<='?'selected':''}>≤</option><option value=">=" ${b.condOp==='>='?'selected':''}>≥</option><option value="=" ${b.condOp==='='?'selected':''}>=</option></select> <input type="number" min="0" value="${b.condValue}" style="width:50px" onchange='updateCondField(${pathStr},"condValue",this.value)'> 까지 (최대 <input type="number" min="1" value="${b.maxIter}" style="width:40px" onchange='updateCondField(${pathStr},"maxIter",this.value)'>회)</div>`;
         return renderCondContainer(b, path, pathStr, condUI);
       }
       return '';
