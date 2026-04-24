@@ -1305,7 +1305,7 @@
         else if (enabledScheds.length > 1) metaText = `스케줄 ${enabledScheds.length}개 · 블록 ${total}개`;
         else if (allScheds.length > 0) metaText = `스케줄 ${allScheds.length}개(꺼짐) · 블록 ${total}개`;
         else metaText = `블록 ${total}개`;
-        const playBtn = hasSchedule ? `<button class="wf-preset-play" onclick="event.stopPropagation();togglePresetSchedules('${p.id}',${!isActive})" title="${isActive ? '일시정지' : '재생'}" style="background:none;border:none;cursor:pointer;font-size:16px;padding:2px 4px;color:${isActive ? '#43a047' : '#999'};">${isActive ? '&#9646;&#9646;' : '&#9654;'}</button>` : '';
+        const playBtn = hasSchedule ? `<button class="wf-preset-play" onclick="event.stopPropagation();togglePresetSchedules('${p.id}',${!isActive})" title="${isActive ? '일시정지' : '재생'}" style="background:none;border:none;cursor:pointer;font-size:16px;padding:2px 4px;color:${isActive ? '#43a047' : '#999'};">${isActive ? '&#10074;&#10074;' : '&#9654;'}</button>` : '';
         return `
           <div class="wf-preset-item ${p.id === wfCurrentId ? 'active' : ''}" onclick="selectPreset('${p.id}')">
             <div style="flex:1;min-width:0;">
