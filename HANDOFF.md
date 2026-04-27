@@ -4,24 +4,17 @@
 
 ## 개요
 
-로컬 Node.js 대시보드. 콴다과외 매칭 업무 자동화 (시트 정리, 페어링 생성, 매칭 제안, 매칭결과 확인, 유저메모 편집). 브라우저로 `http://localhost:3000` 접속해서 사용.
+로컬 Node.js 대시보드. 콴다과외 매칭 업무 자동화 (시트 정리, 페어링 생성, 매칭 제안, 매칭결과 확인, 유저메모 편집). 공용PC(Windows)에서 서버 실행, 같은 네트워크 기기에서 `http://192.168.0.185:3000` 접속.
 
-**폴더 구조:**
-```
-matching-dashboard/
-├── win/     ← Windows 버전 (start.vbs로 실행)
-├── mac/     ← Mac 버전 (start.sh로 실행)
-└── HANDOFF.md
-```
-
-각 폴더 안에 동일한 코드. OS별 시작 스크립트만 다름.
-- **Windows**: `start.vbs` 더블클릭 또는 `start.ps1` 실행
-- **Mac**: `chmod +x start.sh && ./start.sh`
-- 시작 스크립트가 node_modules 없으면 자동으로 `npm install` 실행 (Node.js만 설치되어 있으면 됨)
+**배포 구조:**
+- 개발: `iris.kwon` PC에서 코드 수정 → git push
+- 공용PC(`QANDA CX`): 대시보드 웹에서 업데이트 버튼 → git pull + 서버 재시작
+- 서버: VBS + BAT 루프로 hidden background 실행
+- Chrome CDP: `--remote-debugging-port=9333` (별도 프로필)
 
 **스택**
 - Express 5
-- Playwright (CDP로 기존 크롬에 attach — `--remote-debugging-port=9222`)
+- Playwright (CDP로 기존 크롬에 attach — port 9333)
 - googleapis (Google Sheets)
 - node-cron (스케줄러)
 - node-notifier (알림)
@@ -31,40 +24,86 @@ matching-dashboard/
 ## 파일 구조
 
 ```
-matching-dashboard/
-├── server.js              # Express 서버, 작업/스케줄 관리, REST API
-├── config.json            # 모드, 시트 ID, GAS URL, Slack 토큰
+match_dashboard/
+├── server.js              # Express 서버, 작업/스케줄/큐 관리, REST API
+├── config.json            # 모드, 시트 ID, Slack 토큰 등 (gitignore)
+├── config.example.json    # config 템플릿
 ├── sheets.js              # Google Sheets 헬퍼
 ├── abort.js               # 중단 요청 플래그 + activePage 관리
 ├── credentials.json       # Google API credentials (gitignore)
 ├── oauth-token.json       # OAuth 토큰 (gitignore)
+├── version.json           # 현재 버전
+├── changelog.json         # 버전별 변경 이력
+├── wf-presets.json        # 워크플로 프리셋 데이터 (gitignore, 서버 저장)
+├── schedules.json         # 스케줄 영속화 (gitignore, 서버 재시작 시 복원)
 ├── automation/
-│   ├── browser.js         # CDP 크롬 attach, newBackgroundPage (포커스 안 뺏는 백그라운드 탭)
+│   ├── browser.js         # CDP 크롬 attach, newBackgroundPage
 │   ├── sheetPrep.js       # prepNewSheet, prepRematchSheet, createMonthlyTab
 │   ├── pairing.js         # runPairing(mode) — 5워커 병렬
-│   ├── statusCheck.js     # runStatusCheck(mode) — 5워커 병렬
+│   ├── statusCheck.js     # runStatusCheck(mode), runStatusCheckForType — 5워커 병렬
 │   ├── aim.js             # runAim(mode) — 매칭 제안 (AIM + 수동 + 임의완화 3단계)
 │   └── userMemo.js        # 유저메모 어드민 스크래핑 + 저장 + Slack 검색
 ├── public/
-│   ├── index.html         # 메인 대시보드 (사이드바 + 기능 카드)
-│   └── userMemo.html      # 유저메모 편집 전용 페이지
-├── start.vbs / start.ps1 / start.bat  # Windows 자동 실행 스크립트
-└── install-startup.bat / install-startup.ps1
+│   ├── index.html         # 메인 대시보드 (기능/워크플로/당일현황/대시보드/설정)
+│   ├── userMemo.html      # 유저메모 편집 전용 페이지
+│   └── memoGate.html      # 유저메모 편집 게이트 (Slack 링크 → 편집자 확인)
+└── .gitignore
 ```
 
 ## 주요 작업 (JOBS)
 
-`server.js`의 `JOBS` 객체에 정의됨:
+`server.js`의 `JOBS` 객체에 정의됨 + 워크플로 프리셋이 동적 등록됨:
 
 | jobId | 이름 | 설명 |
 |---|---|---|
 | `prep` / `prep:new` / `prep:rematch` | 시트 정리 | sheetPrep |
 | `pairing` | 페어링 생성 | runPairing |
-| `aim` / `aim:new` / `aim:rematch` | 매칭 제안 (AIM) | runAim — 자동 AI 매칭 + 수동매칭 + 임의완화 |
+| `aim` / `aim:new` / `aim:rematch` | 매칭 제안 (AIM) | runAim — AIM + 수동매칭 + 임의완화 |
 | `statusCheck` / `statusCheck:new` / `statusCheck:rematch` | 매칭결과 확인 | runStatusCheck |
 | `monthly` | 월별 탭 생성 | createMonthlyTab |
+| `wf:{presetId}` | 워크플로 프리셋 | 동적 등록, runWfBlocks로 실행 |
 
-`config.mode` 가 `"1"` / `"2"` / `"both"` — 현재 `"both"`.
+## 작업 큐 시스템
+
+`server.js`의 `runTask`:
+- **다른 종류 작업** → 동시 실행 허용 (예: 시트 정리 + 매칭결과 확인)
+- **같은 종류 작업** → 큐에 넣고 순차 대기
+- **워크플로 프리셋**은 모두 `wf` 그룹으로 순차 실행
+- `runningJobs` (Set) + `taskQueue` 배열로 관리
+
+## 워크플로 시스템
+
+### 블록 종류
+- `job` — 단일 작업 (시트 정리, 페어링, 매칭 제안 등)
+- `loop` — N회 반복, 자식 블록 포함
+- `condLoop` — 조건 반복 (시트 status 건수 기준), 신규/재매칭/전체
+- `userMemo` — 유저메모 편집 요청 (Slack 알림 → 대기 → 완료 시 재개)
+
+### 블록 중첩
+반복/조건 블록 안에 또 반복/조건 블록 가능 (재귀 구조)
+
+### 프리셋
+- localStorage에 UI 상태, `wf-presets.json`에 서버 데이터 저장
+- 프리셋 저장 시 서버에도 동기화 (스케줄 실행용)
+- 프리셋 목록 드래그 드롭 순서 변경 가능
+
+### 스케줄
+- **주기**: N분 간격 (등록 즉시 1회 실행)
+- **시간**: 특정 시각 + 요일
+- **일자**: 특정 날짜 (1회/매월/매년)
+- `schedules.json`에 영속화 → 서버 재시작 시 자동 복원
+- 복원 시 다음 실행 예정 시간 로그 표시
+- 프리셋 목록에 재생/일시정지 버튼 (스케줄 일괄 ON/OFF)
+
+### 유저메모 편집 블록 (human-in-the-loop)
+1. 편집 대상 건수 체크 → 0건이면 자동 건너뜀
+2. Slack 채널에 알림 발송 (건수 + 태그 대상 멘션 + 편집 링크)
+3. 서버 pending 상태로 대기
+4. Slack 링크 클릭 → `memoGate.html` → 편집자 선택 → accept → 유저메모 편집 페이지
+5. 다른 사람이 이미 accept → "이미 편집 중" 안내 → 5초 후 닫기
+6. 모두 거절 → pending 해제, 워크플로 건너뜀
+7. 편집 완료 (모든 항목 처리 + 탭 닫힘) → 서버에 complete → 워크플로 재개
+8. Slack 메시지 업데이트: 수락 시 "OO님이 편집 시작" / 완료 시 "편집 완료" (원본 메시지 수정, 별도 메시지 안 보냄)
 
 ## 매칭 제안 (AIM) 핵심 로직 — `automation/aim.js`
 
@@ -74,190 +113,141 @@ matching-dashboard/
    - `신청서 미작성` → 스킵
    - `매칭 완료` → 시트에 반영 후 다음
    - `AIM 진행중` → 매칭 중단 후 재시도
+   - `AIM 실패` → tutorPairingStatus를 MATCHING으로 변경 후 재시도
 
-2. **1단계 AIM** — `tryAim()`
-   - "AI 매칭 검색" 버튼 → "AIM 매칭 시작" 버튼 클릭
-   - "제안서 발송 대상이 없습니다" 모달 체크
-   - 성공 시 시트 status → `매칭중`
+2. **특정 튜터풀 모드** — 키워드 매칭 시 해당 튜터 ID 직접 검색
 
-3. **2단계 수동매칭** — `tryManualMatch(relax='base')`
-   - product name에서 시수 파싱 (주 N회, NN분)
-   - 학생 시간표 (어드민 `weeklyAvailablePeriods`) vs 선생님 timeline 비교
-   - 시간 매칭 성공한 선생님에게 "전송하기" 클릭 → 모달의 "매칭 제안하기" 클릭
-   - **EXPERT면 "전문 강사 여부" 토글 ON** — 매 검색 직전 확인 (이미 ON이면 건드리지 않음)
-   - 학생당 최대 2명까지 제안
+3. **교대/메디컬 포함 시** — AIM 건너뛰고 변형 수동매칭 우선
 
-4. **3단계 임의완화** (수동매칭 실패 시)
-   - **relax1**: 입시 전형 정시+기타 추가, 튜터 스타일 삭제
-   - **relax2**: 성적대 해제
-   - **relax3**: 고3 가능 과목 → 과목으로 이동
+4. **1단계 AIM** — AI 매칭 시작 버튼 클릭
+   - AIM 성공 후 `waitForLoadState`로 리다이렉트 완료 대기 (네비게이션 충돌 방지)
 
-5. **시수 파싱 실패 / 희망시간 불일치** → status `확인 필요` + 메모 컬럼에 사유 기록
+5. **2단계 수동매칭** — 시간표 비교 후 전송하기
+   - EXPERT면 "전문 강사 여부" 토글 ON
+   - 학생당 최대 2명까지 제안 (`MAX_PROPOSALS_PER_STUDENT = 2`)
+   - 전송 시도 상한 10회 (`MAX_SEND_ATTEMPTS = 10`)
 
-## 유저메모 편집 — `public/userMemo.html` + `automation/userMemo.js`
+6. **3단계 임의완화** (relax1~3)
 
-`?type=new` 또는 `?type=rematch` 쿼리로 신규/재매칭 분기.
+7. **sendProposal 성공 감지**: 모달 닫힘 OR 테이블 상태 변경 ("전송하기" → "응답대기" 등)
 
-**목록 필터링** (`/api/userMemo/list`):
-- 신규: `매칭중`, `확인 필요` 만
-- 재매칭: `첫수업전재매칭`, `일반 재매칭`, `매칭중`, `보류`, `확인 필요` 만
+8. **navigation interrupted 에러 시 1회 자동 재시도**
 
-**상세 데이터 (어드민 `__NEXT_DATA__` 기반)**:
-- `pageProps.applicant` — 학생 정보, 시간표, tutorStyles 등
-- `pageProps.product` — 수업명, 시수, 기간
-- `pageProps.user`, `pageProps.match`, `pageProps.pairing` — 추가 정보
-- `applicant.userMemos[]` — 학생 작성 메모 (각 항목 `{tutorMemo, createdAt}` ← 키 이름 헷갈리지만 학생 작성)
-- `applicant.tutorMemo` — 운영팀이 어드민에 저장한 튜터메모 본문
+## 유저메모 편집 — `public/userMemo.html`
 
-**수업신청서 표시 필드** (어드민 `applicant.tutorStyles` 기반):
-- `created_at_kst` ← `applicant.createdAt`
-- `tutor_university_level` ← `tutorStyles.tutorUniversities` (HIGHEST→SKY, HIGHER→서성한 등)
-- `tutor_genders` ← `tutorStyles.tutorGenders` (MALE→남자)
-- `tutor_pass_types` ← `tutorStyles.tutorPassTypes` (EARLY_DECISION→수시)
-- `tutor_tracks` ← `tutorStyles.tutorTracks` (LIBERAL_ARTS→문과)
-- `liked_tutor_styles` ← `tutorStyles.likedTutorStyles` (WARM→따뜻한 선생님)
-- `living_abroad` ← `applicant.livingAbroad` (해외거주 시 강조 + 카카오톡 ID 표시)
-- 가능 시간 ← `applicant.weeklyAvailablePeriods` (요일별 시간 배열)
+- 진입 시 statusCheck 자동 실행 (어드민 상태 동기화 후 목록 표시)
+- 모든 항목 처리 완료 → 5초 카운트다운 → 탭 자동 닫기
+- autoNext: 신규 완료 → 재매칭 자동 이동
+- 워크플로에서 온 경우 (`fromWorkflow=true`) 완료 시 서버에 complete 신호
 
-**상단 뱃지**:
-- 타입 뱃지: `PRO 신규/재매칭` (rank=EXPERT) 또는 `일반 신규/재매칭`
-- status 뱃지: 시트 status 그대로 표시 (매칭중=주황, 매칭완료=초록, 확인필요/보류=빨강, 미처리=파랑)
+## 설정 탭
 
-**참고 자료 3열**:
-1. 상담메모 (innerText 스크래핑, Show 버튼 클릭 필요)
-2. 튜터메모(어드민 현재값) + 유저메모 (위/아래로)
-3. Request (Slack 메시지)
+- **로그인 권한**: Google 계정 인증 (추후 구현)
+- **Slack 태그 대상**: User ID + 별칭 관리. 유저메모 알림 시 @멘션
 
-**저장**: `saveTutorMemo(matchId, tutorMemo)` — 어드민 신청 내용 Edit → tutorMemo textarea 덮어쓰기 → Submit → Yes
+## 대시보드 UI (`public/index.html`)
 
-## 재매칭 status 형식 (변경됨)
+사이드바 메뉴: **기능** / **워크플로** / **당일 현황** / **대시보드** / **설정**
 
-기존 `[3]재매칭완료`, `[5]환불/소멸` 등 번호 접두사 형식에서 → 번호 없는 일반 텍스트로 변경됨:
-- `첫수업전재매칭`
-- `일반 재매칭`
-- `매칭중`
-- `재매칭 완료`
-- `보류`
-- `환불/소멸`
-- `확인 필요`
+### 기능 탭
+- 카드: 시트 정리 / 페어링 생성 / 유저메모 편집 / 매칭 제안 / 매칭결과 확인 / 월별 탭 관리
+- AIM 키워드 설정 모달 (exclude/tutorPool)
+- 실행 로그 (3초 폴링)
+- 상태바 (실행 중 / 대기 중 + 중단 버튼)
 
-영향 받은 파일 (전부 수정 완료):
-- `aim.js`: `excludeRematch`, `completeStatus`, `checkStatus`
-- `statusCheck.js`: `excludeRematch`, `completedStatus`
-- `sheetPrep.js`: `excludeRematch` (두 군데)
-- `userMemo.html`: status 뱃지 색상 매핑
+### 워크플로 탭
+- 3열 레이아웃: 편집 영역(설정바 + 팔레트 + 워크스페이스) | 프리셋 목록 | 스케줄 설정
+- 블록 드래그 드롭 (팔레트 → 워크스페이스, 워크스페이스 내 순서 변경, 컨테이너 간 이동)
+- 드롭 위치 인디케이터 (파란 선)
+- 실행 로그 (클라이언트 + 서버 로그 폴링)
+- 상태바 (기능 탭과 동기화)
 
-## 스케줄러
-
-`server.js`에 in-memory 스케줄 관리. 두 가지 모드:
-
-- **interval**: `*/N * * * *` 형태. 5/10/20/30/40/50/60/90/120분 chip
-- **alarm**: 특정 시각 + 요일. `MM HH * * days` 형태
-
-**서버 재시작 시 사라짐** (영속화 안 되어 있음).
+### 당일 현황 / 대시보드
+빈 페이지 (추후 구현)
 
 ## REST API
 
+### 작업 실행
 - `POST /api/run/:jobId` — 즉시 실행
-- `POST /api/stop` — 현재 작업 중단 요청
+- `POST /api/stop` — 중단 요청 (pending 대기도 즉시 해제)
+
+### 스케줄
 - `POST /api/schedule` `{jobId, type, options}` — 등록
 - `DELETE /api/schedule/:id` — 삭제
 - `PATCH /api/schedule/:id` `{enabled}` — ON/OFF
 - `GET /api/schedules` — 목록
-- `GET /api/logs` — `{running, logs[]}` (최대 500줄)
-- `GET /api/status` — `{running, mode}`
-- `GET /api/userMemo/list?type=new|rematch` — 처리 대상 목록
-- `GET /api/userMemo/detail?matchId=...` — 어드민 + Slack 병렬 조회
-- `POST /api/userMemo/save` — 어드민에 튜터메모 저장
-- `GET /api/debug/nextdata/:matchId` — 어드민 상세 페이지의 `__NEXT_DATA__` 전체 덤프 (디버깅용)
-- `GET /api/debug/pairing/:matchId?relax=0~3` — 페어링 페이지 필터 디버깅
 
-## 대시보드 UI (`public/index.html`)
+### 워크플로 프리셋
+- `POST /api/wf/presets/:id` `{name, workspace}` — 저장
+- `DELETE /api/wf/presets/:id` — 삭제
 
-사이드바 + 메인 컨텐츠 SPA. 메뉴: **기능** / **당일 현황** / **대시보드**
+### 워크플로 대기
+- `GET /api/wf/pending` — pending 상태 조회
+- `POST /api/wf/pending/register` — 랜딩 페이지 등록
+- `POST /api/wf/pending/unregister` — 등록 해제
+- `POST /api/wf/pending/accept` `{name}` — 편집 수락
+- `POST /api/wf/pending/reject` — 편집 거절
+- `POST /api/wf/pending/complete` — 편집 완료
 
-**기능 페이지** (현재 유일하게 컨텐츠 있음):
-- 카드: 시트 정리 / 페어링 생성 / 유저메모 편집하기 (새 창) / 매칭 제안하기 (AIM) / 매칭결과 확인 / 월별 탭 관리
-- 각 카드: 즉시 실행 버튼 (신규/재매칭/전체) + 스케줄 설정 (접기/펼치기)
-- 실행 로그 박스 (3초마다 폴링)
+### 유저메모
+- `GET /api/userMemo/sync?type=new|rematch` — statusCheck 실행 (목록 조회 전)
+- `GET /api/userMemo/list?type=...&filter=initial|all` — 처리 대상 목록
+- `GET /api/userMemo/detail?matchId=...` — 어드민 + Slack 조회
+- `POST /api/userMemo/save` — 어드민 저장
 
-**당일 현황 / 대시보드**: 빈 페이지
+### 설정
+- `POST /api/config/set` `{path, value}` — config 값 설정
+- `GET /api/config/slack-tags` — Slack 태그 대상 조회
+- `POST /api/config/slack-tags` `{tagTargets}` — Slack 태그 대상 저장
 
-## Windows 자동 실행
+### 로그
+- `GET /api/logs` — 메모리 로그 (running 상태 포함)
+- `GET /api/logs/file?date=YYMMDD` — 날짜별 파일 로그
+- `GET /api/logs/files` — 로그 파일 목록
 
-- `start.vbs` → `start.ps1` 을 hidden PowerShell로 실행
-- `start.ps1`:
-  1. 9222 안 열려있으면 크롬 `--remote-debugging-port=9222 --user-data-dir=C:\chrome-debug --start-minimized` 실행
-  2. 3000 안 열려있으면 `node server.js` hidden 프로세스
-  3. `http://localhost:3000` 브라우저로 열기
-  4. 토스트 알림 (UTF-8 BOM 필수 — cp949 디코딩 방지)
+### 버전/배포
+- `GET /api/version` — 현재 버전
+- `GET /api/version/latest` — git fetch 후 원격 버전 비교
+- `GET /api/changelog` — 변경 이력
+- `POST /api/deploy` — git pull + 서버 재시작
+
+## config.json 구조
+
+```json
+{
+  "mode": "both",
+  "sheets": {
+    "new": "시트ID",
+    "rematch": "시트ID"
+  },
+  "gas": { "url": "GAS URL" },
+  "slack": {
+    "botToken": "xoxb-...",
+    "channelId": "기존 채널",
+    "notifyChannelId": "C05KGLU5NG7",
+    "tagTargets": [{"id": "U...", "name": "별칭"}]
+  },
+  "aimKeywords": [{"keyword": "...", "action": "exclude|tutorPool", "tutorIds": "..."}]
+}
+```
 
 ## 주요 이슈/결정 사항
 
-### 1. CDP attach 방식
-사용자 로그인 세션 유지를 위해 이미 떠있는 크롬에 attach. 토스트에 "최소화된 크롬 브라우저를 닫지 마세요" 안내.
+### CDP 포트 9333
+공용PC에서 `chrome.exe --remote-debugging-port=9333 --user-data-dir=C:\chrome-cdp-profile`. PC 재시작 시 수동으로 다시 실행 필요 (자동 시작 미설정).
 
-### 2. `newBackgroundPage()` — 포커스 안 뺏기
-CDP `Target.createTarget` 의 `background:true` 옵션 사용. 새 탭이 활성화되지 않아서 사용자 작업 방해 안 함.
+### sendProposal 성공 감지
+모달 닫힘만으로 판정하면 false negative 발생 (실제 발송됐는데 실패 판정 → 2명 제한 안 걸림). 테이블 상태 변경("전송하기" → 다른 값)도 확인.
 
-### 3. `__NEXT_DATA__` selector
-스크립트 태그라 hidden 상태. `waitForSelector('#__NEXT_DATA__', { state: 'attached' })` 필수 (`visible` 쓰면 timeout).
+### 타임라인 모달 가림 문제
+sendProposal 전 closeAllModals 실행 + 좌표 계산을 모달 닫은 후 수행. closeAllModals는 `.ant-modal-wrap` visible 체크, ESC 5회, 애니메이션 대기.
 
-### 4. 로그가 터미널에 안 나옴
-`server.js` 에서 `console.log` 를 override해서 메모리에만 저장. 대시보드 UI에서만 확인 가능.
+### 시수는 어드민 product name에서 파싱
+시트가 아니라 어드민 `product.name` ("주 2회, 60분 수업")에서 정규식으로 파싱.
 
-### 5. EXPERT 토글
-수동매칭에서 `applicant.rank === 'EXPERT'` 면 매 단계(base/relax1/2/3) 검색 직전 "전문 강사 여부" 토글 ON. 이미 ON이면 그대로 유지 (반복 클릭으로 OFF 되지 않게).
-
-### 6. 시트 ID
-`config.json`:
-- `new`: `1EM5v9fzdkm_YMV07hXcUELAZWQsMmt8OP5QimtIXjvs`
-- `rematch`: `1rMEnyGVtYUnBXbY1enPLIQYhUDewAqKziwTLuW-PebQ`
-
-### 7. 시수는 어드민 product name에서 파싱
-시트가 아니라 어드민 `product.name` ("주 2회, 60분 수업") 에서 정규식으로 파싱. 시트 의존 X.
-
-## 다음 할 일
-
-1. **AIM 모든 단계 실패 시 조건완화 발송** — `aim.js:339` TODO
-2. **당일 현황 페이지** — 오늘 실행 횟수, 처리 건수, 결과 요약
-3. **대시보드 페이지** — 그래프/통계
-4. (선택) 스케줄 영속화
-5. (선택) AI 편집 기능 (`/api/userMemo/ai-edit` placeholder)
+### 브라우저 팝업 차단
+HTTP 환경에서 사용자 클릭 없이 window.open 불가. Slack 알림 + memoGate 링크로 해결.
 
 ---
 
-**가장 최근 변경 (2026-04-21)**:
-- **Win/Mac 이중 폴더 구조**: matching-dashboard/win + mac 으로 분리, 동일 코드 + OS별 시작 스크립트
-- **AIM 키워드 설정**: 대시보드에서 키워드 등록 → exclude(제외) 또는 tutorPool(특정튜터풀) 액션. exclude가 항상 우선.
-- **특정튜터풀 매칭**: 키워드 매칭 시 "이름 및 아이디" ID 필드에 튜터ID 붙여넣기(clipboard paste) → Search → 시간+성별 매칭
-- **교대/메디컬 포함 시**: AIM 건너뛰기 → 변형 필터(교대/메디컬 해제, SKY/서성한/중경외시 추가) → 실패 시 원래 조건 복귀
-- **PRO 마지막 시도**: 모든 매칭 실패 후 PRO면 교대/메디컬 해제 + SKY/서성한/중경외시 추가 매칭 한번 더
-- **전문강사 토글(isExpert)**: `applicant.tutorRank` (어드민 __NEXT_DATA__) 기반으로 변경 (시트 의존 제거)
-- **조건완화 필요 시 시트 업데이트**: status "확인 필요" + 메모 "조건완화 필요"
-- **sendProposal 재작성**: mouse.click 기반, 체크박스 1회만 클릭, orderStatus 에러 감지 (notification/message/modal 전체 스캔)
-- **재매칭 pairingId 검색**: aim.js + statusCheck.js 모두 재매칭은 filters_id 사용
-- **유저메모 편집**: 전체/초기편집 토글 (기본: 초기편집), 전체 버튼 시 신규→재매칭 자동 이동, 시트메모 표시
-- **Slack API**: search.messages → conversations.history(botToken) 로 변경 (search:read scope 불필요)
-- **relax3 과목 추가**: "고3 가능 과목" 바로 아래의 "과목" select를 정확히 찾도록 수정
-
-**이전 변경 (2026-04-17)**:
-- **시간표 자동 확장**: 시수-시간대 불일치 시 요일 ��가 주N회와 맞으면 각 요일의 시작 시간부터 필요한 타임블록만큼 확장 → 어드민 weeklyAvailablePeriods 자동 수정 (`fixAdminSchedule`)
-  - 예: 주3회 90분, 수/금/일 21시만 선택 → 수/금/일 21~22시로 확장
-  - ant-select 드롭다운 조작: scrollIntoView → mouse.click → keyboard.type → 옵션 클릭
-  - 요일 수 < 주N회이면 기존대로 "확인 필요"
-- **AIM 실패 자동 복구**: 어드민 상태가 "AIM 실패"면 `/admin/tutor-pairing/{pairingId}/update`로 이동 → tutorPairingStatus를 MATCHING으로 변경 → 상세 페이지 복귀 → 매칭 재시도 (`fixPairingStatus`)
-- **교대 단독 선택 시 필터 보정**: 대학교 체크박스에 교대만 단독 체크된 경우 → SKY/서성한/중경외시 추가 + 전공 > 교육 체크 후 검색 (`fixGyodaeFilter`, base 단계에서 실행)
-- **수동매칭 timeline 테이블 선택 버그 수정**: 페이지에 timeline 헤더 테이블이 여러 개 있을 때 첫 번째가 아닌 **마지막** 테이블 사용 (table[9]는 다른 섹션, table[10]이 실제 검색 결과)
-- **수동매칭 디버그 로그 강화**: 튜터별 timeline 파싱 결과·시간표·매칭 성공/실패 로그 추가
-
-**이전 변경 (2026-04-16)**:
-- 매칭 제안 (AIM) 기능 안정화: AIM 판정 타이밍 개선, 수동매칭 모달의 "매칭 제안하기" 버튼 매칭 패턴 확장, 모든 모달 디버그 로그 추가
-- EXPERT 전문강사 토글 매 단계 검증 (이미 ON이면 유지)
-- 재매칭 status 형식 변경 반영 (`[3]재매칭완료` → `재매칭 완료` 등) — aim.js / statusCheck.js / sheetPrep.js 전체 수정
-- 유저메모 편집: 신규/재매칭 모두 지원, 수업신청서·가능시간·상단정보 전부 어드민 `__NEXT_DATA__` 기반으로 전환 (시트 의존 제거 → 재매칭 시트에 컬럼 없어도 작동)
-- 유저메모 목록 필터: 신규=매칭중/확인필요, 재매칭=첫수업전재매칭/일반재매칭/매칭중/보류/확인필요
-- 튜터메모(어드민 현재값) 별도 항목으로 표시 (유저메모 위)
-- status 뱃지 추가 (PRO/신규 뱃지 옆)
-- `__NEXT_DATA__` selector를 `state: 'attached'` 로 수정 (script 태그 hidden 이슈)
-- `/api/debug/nextdata/:matchId` 디버그 엔드포인트 추가
+**현재 버전: v4.8.3 (2026-04-27)**
