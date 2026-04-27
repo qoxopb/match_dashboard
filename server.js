@@ -848,12 +848,80 @@ async function runWfBlocks(blocks) {
     } else if (b.kind === 'userMemo') {
       const memoType = b.memoType || 'all';
       const memoFilter = b.memoFilter || 'initial';
-      console.log(`[워크플로] 유저메모 편집 대기 (${memoType})`);
-      wfPendingTask = { type: memoType, filter: memoFilter, createdAt: Date.now() };
-      await new Promise(resolve => { wfPendingTask.resolve = resolve; });
-      wfPendingTask = null;
-      console.log('[워크플로] 유저메모 편집 완료 → 다음 블록');
+      const typeLabel = { new: '신규', rematch: '재매칭', all: '전체' }[memoType] || memoType;
+
+      // 편집 대상 건수 체크
+      const memoCount = await countMemoTargets(memoType, memoFilter);
+      if (memoCount === 0) {
+        console.log(`[워크플로] 유저메모 편집 대상 0건 → 건너뜀`);
+      } else {
+        console.log(`[워크플로] 유저메모 편집 대기 (${typeLabel}, ${memoCount}건)`);
+        // Slack 알림
+        await sendSlackNotification(`${typeLabel} 유저메모 편집이 필요합니다 (${memoCount}건)\n대시보드에서 편집을 시작해주세요.`);
+        // 대기
+        wfPendingTask = { type: memoType, filter: memoFilter, createdAt: Date.now() };
+        await new Promise(resolve => { wfPendingTask.resolve = resolve; });
+        wfPendingTask = null;
+        console.log('[워크플로] 유저메모 편집 완료 → 다음 블록');
+      }
     }
+  }
+}
+
+// --- Slack 알림 ---
+const axios = require('axios');
+
+async function sendSlackNotification(text) {
+  try {
+    const token = config.slack && config.slack.botToken;
+    const channel = config.slack && config.slack.notifyChannelId || config.slack && config.slack.channelId;
+    if (!token || !channel) { console.log('[Slack] 토큰/채널 미설정 → 알림 생략'); return; }
+    await axios.post('https://slack.com/api/chat.postMessage', {
+      channel, text,
+    }, { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } });
+    console.log(`[Slack] 알림 전송: ${text.substring(0, 50)}`);
+  } catch (e) {
+    console.error(`[Slack] 알림 실패: ${e.message}`);
+  }
+}
+
+// --- 유저메모 편집 대상 건수 ---
+async function countMemoTargets(memoType, memoFilter) {
+  try {
+    const sheets = await getSheetsApi();
+    let total = 0;
+    const types = memoType === 'all' ? ['new', 'rematch'] : [memoType];
+    for (const type of types) {
+      const spreadsheetId = config.sheets[type === 'new' ? 'new' : 'rematch'];
+      const tabName = getUserMemoTabName(type);
+      const headerRes = await sheets.spreadsheets.values.get({ spreadsheetId, range: `'${tabName}'!A1:BZ1` });
+      const header = (headerRes.data.values || [])[0] || [];
+      const norm = s => (s || '').replace(/\s+/g, '').toLowerCase();
+      const matchIdCol = type === 'new' ? 'match_id' : 'match ID';
+      const statusCol = type === 'new' ? '매칭상태' : 'status';
+      const matchIdIdx = header.findIndex(h => norm(h) === norm(matchIdCol));
+      const statusIdx = header.findIndex(h => norm(h) === norm(statusCol));
+      const dataRes = await sheets.spreadsheets.values.get({ spreadsheetId, range: `'${tabName}'!A2:BZ` });
+      const rows = dataRes.data.values || [];
+      rows.forEach(row => {
+        const matchId = matchIdIdx >= 0 ? (row[matchIdIdx] || '').trim() : '';
+        if (!matchId) return;
+        const sn = statusIdx >= 0 ? (row[statusIdx] || '').replace(/\s+/g, '').toLowerCase() : '';
+        if (memoFilter === 'initial') {
+          if (sn === '' || sn === 'ready') total++;
+        } else {
+          if (type === 'new') {
+            if (sn === '' || sn === '매칭중' || sn === '확인필요') total++;
+          } else {
+            if (['', 'ready', '첫수업전재매칭', '일반재매칭', '매칭중', '보류', '확인필요'].includes(sn)) total++;
+          }
+        }
+      });
+    }
+    return total;
+  } catch (e) {
+    console.error(`[countMemoTargets] 에러: ${e.message}`);
+    return 0;
   }
 }
 
