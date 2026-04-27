@@ -891,12 +891,12 @@ async function runWfBlocks(blocks) {
         const dashboardUrl = `http://192.168.0.185:${PORT}/memoGate.html?memoType=${memoType}&memoFilter=${memoFilter}`;
         const tagTargets = (config.slack && config.slack.tagTargets || []).map(id => `<@${id}>`).join(' ');
         const tagLine = tagTargets ? `\n${tagTargets}` : '';
-        await sendSlackNotification(
+        const slackMsg = await sendSlackNotification(
           `:memo: *유저메모 편집이 필요합니다*\n${countDesc}${tagLine}`,
           dashboardUrl
         );
         // 대기
-        wfPendingTask = { type: memoType, filter: memoFilter, createdAt: Date.now() };
+        wfPendingTask = { type: memoType, filter: memoFilter, createdAt: Date.now(), slackMsg, countDesc };
         await new Promise(resolve => { wfPendingTask.resolve = resolve; });
         wfPendingTask = null;
         console.log('[워크플로] 유저메모 편집 완료 → 다음 블록');
@@ -912,7 +912,7 @@ async function sendSlackNotification(text, url) {
   try {
     const token = config.slack && config.slack.botToken;
     const channel = (config.slack && config.slack.notifyChannelId) || (config.slack && config.slack.channelId);
-    if (!token || !channel) { console.log('[Slack] 토큰/채널 미설정 → 알림 생략'); return; }
+    if (!token || !channel) { console.log('[Slack] 토큰/채널 미설정 → 알림 생략'); return null; }
     const payload = { channel, text };
     if (url) {
       payload.attachments = [{
@@ -923,12 +923,28 @@ async function sendSlackNotification(text, url) {
     } else {
       payload.blocks = [{ type: 'section', text: { type: 'mrkdwn', text } }];
     }
-    await axios.post('https://slack.com/api/chat.postMessage', payload, {
+    const res = await axios.post('https://slack.com/api/chat.postMessage', payload, {
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     });
     console.log(`[Slack] 알림 전송: ${text.substring(0, 60)}`);
+    return res.data.ok ? { channel, ts: res.data.ts } : null;
   } catch (e) {
     console.error(`[Slack] 알림 실패: ${e.message}`);
+    return null;
+  }
+}
+
+async function updateSlackMessage(msgRef, newText) {
+  try {
+    const token = config.slack && config.slack.botToken;
+    if (!token || !msgRef) return;
+    await axios.post('https://slack.com/api/chat.update', {
+      channel: msgRef.channel, ts: msgRef.ts, text: newText,
+      blocks: [{ type: 'section', text: { type: 'mrkdwn', text: newText } }],
+      attachments: [],
+    }, { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } });
+  } catch (e) {
+    console.error(`[Slack] 메시지 업데이트 실패: ${e.message}`);
   }
 }
 
@@ -1005,7 +1021,8 @@ app.post('/api/wf/pending/accept', (req, res) => {
   const editor = req.body && req.body.name || req.headers['x-forwarded-for'] || req.connection.remoteAddress || '알 수 없음';
   wfPendingTask.editor = editor;
   console.log(`[워크플로] 유저메모 편집 수락 — ${editor}`);
-  sendSlackNotification(`:pencil2: *${editor}* 님이 유저메모 편집을 시작했습니다.`);
+  const countDesc = wfPendingTask.countDesc || '';
+  updateSlackMessage(wfPendingTask.slackMsg, `:memo: *유저메모 편집이 필요합니다*\n${countDesc}\n\n:pencil2: *${editor}* 님이 편집을 시작했습니다.`);
   res.json({ ok: true });
 });
 
@@ -1026,6 +1043,9 @@ app.post('/api/wf/pending/reject', (req, res) => {
 
 app.post('/api/wf/pending/complete', (req, res) => {
   if (wfPendingTask && wfPendingTask.resolve) {
+    const editor = wfPendingTask.editor || '';
+    const countDesc = wfPendingTask.countDesc || '';
+    updateSlackMessage(wfPendingTask.slackMsg, `:white_check_mark: *유저메모 편집 완료*\n${countDesc}\n\n:pencil2: ${editor} 님이 편집 완료`);
     console.log('[워크플로] 유저메모 편집 완료 → 워크플로 재개');
     wfPendingTask.resolve();
     wfPendingTask = null;
