@@ -1819,6 +1819,7 @@
     let _wfPendingNotifyInterval = null;
     let _wfPendingPopup = null;
     let _wfPendingBannerShown = false;
+    let _wfPendingOpened = false;
 
     function showPendingBanner(data) {
       if (_wfPendingBannerShown) return;
@@ -1873,12 +1874,14 @@
         if (data.pending) {
           _pendingData = data;
           showPendingBanner(data);
-          // 자동으로 유저메모 편집기 최대 창으로 열기
-          if (!_wfPendingPopup || _wfPendingPopup.closed) {
+          // 자동 열기: 한 번만
+          if (!_wfPendingOpened) {
+            _wfPendingOpened = true;
             openPendingMemo();
           }
         } else {
           _pendingData = null;
+          _wfPendingOpened = false;
           hidePendingBanner();
           if (_wfPendingNotifyInterval) {
             clearInterval(_wfPendingNotifyInterval);
