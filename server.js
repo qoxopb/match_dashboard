@@ -624,10 +624,16 @@ app.get('/api/debug/pairing/:matchId', async (req, res) => {
 });
 
 app.post('/api/stop', (req, res) => {
-  if (!running) return res.json({ ok: false, message: '실행 중인 작업 없음' });
+  if (!running && !wfPendingTask) return res.json({ ok: false, message: '실행 중인 작업 없음' });
   requestAbort();
-  addLog(`=== ${running} 중단 요청 ===`);
-  res.json({ ok: true, message: `${running} 중단 요청됨` });
+  // pending 대기 중이면 즉시 해제
+  if (wfPendingTask && wfPendingTask.resolve) {
+    addLog('[워크플로] 유저메모 편집 대기 중단');
+    wfPendingTask.resolve();
+    wfPendingTask = null;
+  }
+  if (running) addLog(`=== ${running} 중단 요청 ===`);
+  res.json({ ok: true, message: '중단 요청됨' });
 });
 
 // --- AIM 키워드 설정 API ---
@@ -913,16 +919,11 @@ async function sendSlackNotification(text, url) {
     const token = config.slack && config.slack.botToken;
     const channel = (config.slack && config.slack.notifyChannelId) || (config.slack && config.slack.channelId);
     if (!token || !channel) { console.log('[Slack] 토큰/채널 미설정 → 알림 생략'); return null; }
-    const payload = { channel, text };
-    if (url) {
-      payload.attachments = [{
-        color: '#1976d2',
-        blocks: [{ type: 'section', text: { type: 'mrkdwn', text } }],
-        actions: [{ type: 'button', text: '유저메모 편집 열기', url, style: 'primary' }],
-      }];
-    } else {
-      payload.blocks = [{ type: 'section', text: { type: 'mrkdwn', text } }];
-    }
+    const msgText = url ? `${text}\n\n:point_right: <${url}|유저메모 편집 열기>` : text;
+    const payload = {
+      channel, text: msgText,
+      blocks: [{ type: 'section', text: { type: 'mrkdwn', text: msgText } }],
+    };
     const res = await axios.post('https://slack.com/api/chat.postMessage', payload, {
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     });
