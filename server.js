@@ -898,22 +898,10 @@ async function sendSlackNotification(text, url) {
     const token = config.slack && config.slack.botToken;
     const channel = (config.slack && config.slack.notifyChannelId) || (config.slack && config.slack.channelId);
     if (!token || !channel) { console.log('[Slack] 토큰/채널 미설정 → 알림 생략'); return; }
-    const blocks = [
-      { type: 'section', text: { type: 'mrkdwn', text } },
-    ];
-    if (url) {
-      blocks.push({
-        type: 'actions',
-        elements: [{
-          type: 'button',
-          text: { type: 'plain_text', text: '유저메모 편집 열기' },
-          url,
-          style: 'primary',
-        }],
-      });
-    }
+    const msgText = url ? `${text}\n\n<${url}|유저메모 편집 열기>` : text;
     await axios.post('https://slack.com/api/chat.postMessage', {
-      channel, text, blocks,
+      channel, text: msgText,
+      blocks: [{ type: 'section', text: { type: 'mrkdwn', text: msgText } }],
     }, { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } });
     console.log(`[Slack] 알림 전송: ${text.substring(0, 60)}`);
   } catch (e) {
