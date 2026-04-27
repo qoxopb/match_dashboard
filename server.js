@@ -122,12 +122,34 @@ async function runTask(jobId) {
   }
 }
 
-// --- 스케줄 관리 ---
+// --- 스케줄 관리 (파일 영속화) ---
+const schedulesPath = path.join(__dirname, 'schedules.json');
 let scheduleIdCounter = 1;
 const schedules = {}; // id → { id, jobId, type, label, cronTask, enabled, ... }
 
-function addSchedule(jobId, type, options) {
-  const id = scheduleIdCounter++;
+function saveSchedulesToFile() {
+  const data = Object.values(schedules).map(s => ({
+    id: s.id, jobId: s.jobId, type: s.type, label: s.label, enabled: s.enabled, options: s.options,
+  }));
+  try { fs.writeFileSync(schedulesPath, JSON.stringify(data, null, 2), 'utf-8'); } catch {}
+}
+
+function loadSchedulesFromFile() {
+  try {
+    const data = JSON.parse(fs.readFileSync(schedulesPath, 'utf-8'));
+    let maxId = 0;
+    for (const s of data) {
+      if (s.id > maxId) maxId = s.id;
+      const restored = addSchedule(s.jobId, s.type, s.options, s.id, s.enabled, true);
+      if (restored) console.log(`[스케줄] 복원: ${s.label} (${s.enabled ? 'ON' : 'OFF'})`);
+    }
+    if (maxId >= scheduleIdCounter) scheduleIdCounter = maxId + 1;
+  } catch {}
+}
+
+function addSchedule(jobId, type, options, forceId, forceEnabled, isRestore) {
+  const id = forceId || scheduleIdCounter++;
+  if (!forceId && id >= scheduleIdCounter) scheduleIdCounter = id + 1;
   const job = JOBS[jobId];
   if (!job) return null;
 
@@ -173,15 +195,18 @@ function addSchedule(jobId, type, options) {
     await runTask(jobId);
   }, { scheduled: true });
 
-  schedules[id] = { id, jobId, jobName: job.name, type, label, cronExpr, enabled: true, cronTask };
-  console.log(`[스케줄] 등록: ${job.name} — ${label}`);
-
-  // 주기 타입은 등록 즉시 1회 실행
-  if (type === 'interval') {
-    console.log(`[스케줄] ${job.name} 즉시 실행`);
-    runTask(jobId);
+  const enabled = forceEnabled !== undefined ? forceEnabled : true;
+  if (!enabled) cronTask.stop();
+  schedules[id] = { id, jobId, jobName: job.name, type, label, cronExpr, enabled, cronTask, options };
+  if (!isRestore) {
+    console.log(`[스케줄] 등록: ${job.name} — ${label}`);
+    // 주기 타입은 등록 즉시 1회 실행
+    if (type === 'interval') {
+      console.log(`[스케줄] ${job.name} 즉시 실행`);
+      runTask(jobId);
+    }
   }
-
+  saveSchedulesToFile();
   return id;
 }
 
@@ -191,6 +216,7 @@ function removeSchedule(id) {
   sched.cronTask.stop();
   delete schedules[id];
   console.log(`[스케줄] 삭제: ${sched.jobName} — ${sched.label}`);
+  saveSchedulesToFile();
   return true;
 }
 
@@ -200,6 +226,7 @@ function toggleSchedule(id, enabled) {
   sched.enabled = enabled;
   if (enabled) sched.cronTask.start(); else sched.cronTask.stop();
   console.log(`[스케줄] ${sched.jobName} — ${sched.label}: ${enabled ? 'ON' : 'OFF'}`);
+  saveSchedulesToFile();
   return true;
 }
 
@@ -879,6 +906,9 @@ function registerWfJob(id, name, workspace) {
 for (const [id, preset] of Object.entries(wfPresetsData)) {
   registerWfJob(id, preset.name, preset.workspace);
 }
+
+// 저장된 스케줄 복원
+loadSchedulesFromFile();
 
 app.post('/api/wf/presets/:id', (req, res) => {
   const { id } = req.params;

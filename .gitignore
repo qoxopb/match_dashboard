@@ -4,6 +4,7 @@ oauth-client.json
 oauth-token.json
 config.json
 wf-presets.json
+schedules.json
 *.log
 logs/
 .DS_Store
