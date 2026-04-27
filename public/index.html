@@ -1351,10 +1351,11 @@
         const playBtn = hasSchedule ? `<button class="wf-preset-play" onclick="event.stopPropagation();togglePresetSchedules('${p.id}',${!isActive})" title="${isActive ? '일시정지' : '재생'}" style="background:none;border:none;cursor:pointer;font-size:16px;padding:2px 4px;color:${isActive ? '#43a047' : '#999'};">${isActive ? '&#10074;&#10074;' : '&#9654;'}</button>` : '';
         return `
           <div class="wf-preset-item ${p.id === wfCurrentId ? 'active' : ''}" draggable="true"
-               ondragstart="_dragPresetIdx=${idx};event.dataTransfer.setData('text/preset','1');event.dataTransfer.effectAllowed='move';"
-               ondragover="if(event.dataTransfer.types.includes('text/preset')){event.preventDefault();event.stopPropagation();presetDragOver(event,${idx});}"
+               ondragstart="_dragPresetIdx=${idx};event.dataTransfer.setData('text/plain','preset');event.dataTransfer.effectAllowed='move';event.stopPropagation();"
+               ondragover="if(_dragPresetIdx!==null){event.preventDefault();event.stopPropagation();presetDragOver(event,${idx});}"
                ondragleave="this.style.borderTop='';this.style.borderBottom='';"
                ondrop="event.preventDefault();event.stopPropagation();presetDrop(event,${idx})"
+               ondragend="_dragPresetIdx=null;document.querySelectorAll('.wf-preset-item').forEach(el=>{el.style.borderTop='';el.style.borderBottom=''});"
                onclick="selectPreset('${p.id}')">
             <div style="flex:1;min-width:0;">
               <div class="wf-preset-name">${escapeHtml(p.name)}</div>
