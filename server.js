@@ -887,7 +887,6 @@ async function runWfBlocks(blocks) {
         const countDesc = memoType === 'all'
           ? `신규 ${memoCounts.new}건 / 재매칭 ${memoCounts.rematch}건`
           : `${typeLabel} ${totalCount}건`;
-        console.log(`[워크플로] 유저메모 편집 대기 (${countDesc})`);
         const dashboardUrl = `http://192.168.0.185:${PORT}/memoGate.html?memoType=${memoType}&memoFilter=${memoFilter}`;
         const tagTargets = (config.slack && config.slack.tagTargets || []).map(t => typeof t === 'string' ? `<@${t}>` : `<@${t.id}>`).join(' ');
         const tagLine = tagTargets ? `\n${tagTargets}` : '';
@@ -895,6 +894,7 @@ async function runWfBlocks(blocks) {
           `:memo: *유저메모 편집이 필요합니다*\n${countDesc}${tagLine}`,
           dashboardUrl
         );
+        console.log(`[워크플로] Slack 유저메모 편집 요청 발송 완료 (${countDesc}) — 편집 대기 중`);
         // 대기
         wfPendingTask = { type: memoType, filter: memoFilter, createdAt: Date.now(), slackMsg, countDesc };
         await new Promise(resolve => { wfPendingTask.resolve = resolve; });
