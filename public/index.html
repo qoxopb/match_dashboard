@@ -1351,9 +1351,10 @@
         const playBtn = hasSchedule ? `<button class="wf-preset-play" onclick="event.stopPropagation();togglePresetSchedules('${p.id}',${!isActive})" title="${isActive ? '일시정지' : '재생'}" style="background:none;border:none;cursor:pointer;font-size:16px;padding:2px 4px;color:${isActive ? '#43a047' : '#999'};">${isActive ? '&#10074;&#10074;' : '&#9654;'}</button>` : '';
         return `
           <div class="wf-preset-item ${p.id === wfCurrentId ? 'active' : ''}" draggable="true"
-               ondragstart="_dragPresetIdx=${idx};event.dataTransfer.effectAllowed='move';"
-               ondragover="event.preventDefault();presetDragOver(event,${idx});"
-               ondrop="presetDrop(${idx})"
+               ondragstart="_dragPresetIdx=${idx};event.dataTransfer.setData('text/preset','1');event.dataTransfer.effectAllowed='move';"
+               ondragover="if(event.dataTransfer.types.includes('text/preset')){event.preventDefault();event.stopPropagation();presetDragOver(event,${idx});}"
+               ondragleave="this.style.borderTop='';this.style.borderBottom='';"
+               ondrop="event.preventDefault();event.stopPropagation();presetDrop(event,${idx})"
                onclick="selectPreset('${p.id}')">
             <div style="flex:1;min-width:0;">
               <div class="wf-preset-name">${escapeHtml(p.name)}</div>
@@ -1368,22 +1369,24 @@
 
     function presetDragOver(e, idx) {
       const items = document.querySelectorAll('.wf-preset-item');
-      items.forEach(el => el.style.borderTop = '');
-      items.forEach(el => el.style.borderBottom = '');
+      items.forEach(el => { el.style.borderTop = ''; el.style.borderBottom = ''; });
       const rect = items[idx].getBoundingClientRect();
       if (e.clientY < rect.top + rect.height / 2) {
-        items[idx].style.borderTop = '2px solid #1976d2';
+        items[idx].style.borderTop = '3px solid #1976d2';
       } else {
-        items[idx].style.borderBottom = '2px solid #1976d2';
+        items[idx].style.borderBottom = '3px solid #1976d2';
       }
     }
 
-    function presetDrop(targetIdx) {
+    function presetDrop(e, targetIdx) {
       document.querySelectorAll('.wf-preset-item').forEach(el => { el.style.borderTop = ''; el.style.borderBottom = ''; });
       if (_dragPresetIdx === null || _dragPresetIdx === targetIdx) return;
+      const rect = e.currentTarget.getBoundingClientRect();
+      const dropBefore = e.clientY < rect.top + rect.height / 2;
       const item = wfPresets.splice(_dragPresetIdx, 1)[0];
-      const adj = _dragPresetIdx < targetIdx ? targetIdx : targetIdx;
-      wfPresets.splice(adj, 0, item);
+      let insertIdx = _dragPresetIdx < targetIdx ? targetIdx - 1 : targetIdx;
+      if (!dropBefore) insertIdx++;
+      wfPresets.splice(insertIdx, 0, item);
       _dragPresetIdx = null;
       savePresetIndex();
       renderPresetList();
