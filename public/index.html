@@ -1487,7 +1487,7 @@
       const url = memoType === 'all'
         ? `/userMemo.html?type=new${filterParam}&autoNext=true`
         : `/userMemo.html?type=${memoType}${filterParam}`;
-      return window.open(url, '_blank');
+      return window.open(url, '_blank', `width=${screen.availWidth},height=${screen.availHeight},left=0,top=0`);
     }
 
     async function runBlocks(blocks) {
@@ -1874,9 +1874,9 @@
         if (data.pending) {
           _pendingData = data;
           showPendingBanner(data);
-          if (!_wfPendingNotifyInterval) {
-            sendWfPendingNotification(data);
-            _wfPendingNotifyInterval = setInterval(() => sendWfPendingNotification(data), 60000);
+          // 자동으로 유저메모 편집기 최대 창으로 열기
+          if (!_wfPendingPopup || _wfPendingPopup.closed) {
+            openPendingMemo();
           }
         } else {
           _pendingData = null;
