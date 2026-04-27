@@ -860,9 +860,9 @@ async function runWfBlocks(blocks) {
           ? `신규 ${memoCounts.new}건 / 재매칭 ${memoCounts.rematch}건`
           : `${typeLabel} ${totalCount}건`;
         console.log(`[워크플로] 유저메모 편집 대기 (${countDesc})`);
-        const dashboardUrl = `http://192.168.0.185:${PORT}/memoLanding.html?memoType=${memoType}&memoFilter=${memoFilter}`;
+        const dashboardUrl = `http://192.168.0.185:${PORT}/memoGate.html?memoType=${memoType}&memoFilter=${memoFilter}`;
         await sendSlackNotification(
-          `:memo: *유저메모 편집이 필요합니다*\n${countDesc}\n아래 버튼을 눌러 편집을 시작해주세요.`,
+          `:memo: *유저메모 편집이 필요합니다*\n${countDesc}`,
           dashboardUrl
         );
         // 대기

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>유저메모 편집</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, 'Segoe UI', sans-serif;
+      background: #f0f2f5; color: #333;
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh;
+    }
+    .card {
+      background: #fff; border-radius: 16px; padding: 40px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.1);
+      max-width: 400px; width: 90%; text-align: center;
+    }
+    .icon { font-size: 48px; margin-bottom: 16px; }
+    .title { font-size: 18px; font-weight: 700; margin-bottom: 12px; }
+    .msg { font-size: 14px; color: #666; line-height: 1.6; }
+    .countdown { font-size: 13px; color: #999; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon" id="icon">&#9998;</div>
+    <div class="title" id="title">확인 중...</div>
+    <div class="msg" id="msg"></div>
+    <div class="countdown" id="countdown"></div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const memoType = params.get('memoType') || 'all';
+    const memoFilter = params.get('memoFilter') || 'initial';
+
+    async function init() {
+      // pending 체크
+      const pendingRes = await fetch('/api/wf/pending');
+      const pendingData = await pendingRes.json();
+
+      if (!pendingData.pending) {
+        showBlock('&#10003;', '편집 작업이 없습니다', '대기 중인 유저메모 편집이 없습니다.', 3);
+        return;
+      }
+
+      // accept 시도
+      const name = localStorage.getItem('editorName') || '';
+      const acceptRes = await fetch('/api/wf/pending/accept', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      const acceptData = await acceptRes.json();
+
+      if (acceptData.ok) {
+        // 성공 → 유저메모 편집 페이지로 이동
+        const filterParam = memoFilter === 'initial' ? '&filter=initial' : '';
+        const url = memoType === 'all'
+          ? `/userMemo.html?type=new${filterParam}&autoNext=true&fromWorkflow=true`
+          : `/userMemo.html?type=${memoType}${filterParam}&fromWorkflow=true`;
+        location.href = url;
+      } else {
+        // 이미 다른 사람이 편집 중
+        showBlock('&#128221;', '이미 편집 중입니다', '다른 사용자가 유저메모를 편집하고 있습니다.', 5);
+      }
+    }
+
+    function showBlock(icon, title, msg, sec) {
+      document.getElementById('icon').innerHTML = icon;
+      document.getElementById('title').textContent = title;
+      document.getElementById('msg').textContent = msg;
+      const cdEl = document.getElementById('countdown');
+      cdEl.textContent = `${sec}초 후 창이 닫힙니다`;
+      const timer = setInterval(() => {
+        sec--;
+        if (sec > 0) {
+          cdEl.textContent = `${sec}초 후 창이 닫힙니다`;
+        } else {
+          clearInterval(timer);
+          window.close();
+          cdEl.textContent = '이 창을 닫아주세요.';
+        }
+      }, 1000);
+    }
+
+    init();
+  </script>
+</body>
+</html>

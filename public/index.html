@@ -1846,7 +1846,7 @@
     function openPendingMemo() {
       if (!_pendingData) return;
       if (_wfPendingPopup && !_wfPendingPopup.closed) { _wfPendingPopup.focus(); return; }
-      const url = `/memoLanding.html?memoType=${_pendingData.type}&memoFilter=${_pendingData.filter || 'initial'}`;
+      const url = `/memoGate.html?memoType=${_pendingData.type}&memoFilter=${_pendingData.filter || 'initial'}`;
       _wfPendingPopup = window.open(url, '_blank', `width=${screen.availWidth},height=${screen.availHeight},left=0,top=0`);
       const check = setInterval(() => {
         if (_wfPendingPopup && _wfPendingPopup.closed) {
