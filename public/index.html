@@ -1874,11 +1874,6 @@
         if (data.pending) {
           _pendingData = data;
           showPendingBanner(data);
-          // 자동 열기: 한 번만
-          if (!_wfPendingOpened) {
-            _wfPendingOpened = true;
-            openPendingMemo();
-          }
         } else {
           _pendingData = null;
           _wfPendingOpened = false;

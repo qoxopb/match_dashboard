@@ -898,11 +898,19 @@ async function sendSlackNotification(text, url) {
     const token = config.slack && config.slack.botToken;
     const channel = (config.slack && config.slack.notifyChannelId) || (config.slack && config.slack.channelId);
     if (!token || !channel) { console.log('[Slack] 토큰/채널 미설정 → 알림 생략'); return; }
-    const msgText = url ? `${text}\n\n<${url}|유저메모 편집 열기>` : text;
-    await axios.post('https://slack.com/api/chat.postMessage', {
-      channel, text: msgText,
-      blocks: [{ type: 'section', text: { type: 'mrkdwn', text: msgText } }],
-    }, { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } });
+    const payload = { channel, text };
+    if (url) {
+      payload.attachments = [{
+        color: '#1976d2',
+        blocks: [{ type: 'section', text: { type: 'mrkdwn', text } }],
+        actions: [{ type: 'button', text: '유저메모 편집 열기', url, style: 'primary' }],
+      }];
+    } else {
+      payload.blocks = [{ type: 'section', text: { type: 'mrkdwn', text } }];
+    }
+    await axios.post('https://slack.com/api/chat.postMessage', payload, {
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    });
     console.log(`[Slack] 알림 전송: ${text.substring(0, 60)}`);
   } catch (e) {
     console.error(`[Slack] 알림 실패: ${e.message}`);
