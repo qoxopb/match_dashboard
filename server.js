@@ -665,7 +665,7 @@ app.post('/api/config/set', (req, res) => {
   res.json({ ok: true, path: keyPath, value });
 });
 
-// 슬랙 태그 대상 API
+// 슬랙 태그 대상 API — [{id, name}]
 app.get('/api/config/slack-tags', (req, res) => {
   res.json(config.slack && config.slack.tagTargets || []);
 });
@@ -889,7 +889,7 @@ async function runWfBlocks(blocks) {
           : `${typeLabel} ${totalCount}건`;
         console.log(`[워크플로] 유저메모 편집 대기 (${countDesc})`);
         const dashboardUrl = `http://192.168.0.185:${PORT}/memoGate.html?memoType=${memoType}&memoFilter=${memoFilter}`;
-        const tagTargets = (config.slack && config.slack.tagTargets || []).map(id => `<@${id}>`).join(' ');
+        const tagTargets = (config.slack && config.slack.tagTargets || []).map(t => typeof t === 'string' ? `<@${t}>` : `<@${t.id}>`).join(' ');
         const tagLine = tagTargets ? `\n${tagTargets}` : '';
         const slackMsg = await sendSlackNotification(
           `:memo: *유저메모 편집이 필요합니다*\n${countDesc}${tagLine}`,
