@@ -333,6 +333,7 @@
         <li data-view="workflow" onclick="switchView('workflow')">워크플로</li>
         <li data-view="status" onclick="switchView('status')">당일 현황</li>
         <li data-view="dashboard" onclick="switchView('dashboard')">대시보드</li>
+        <li data-view="settings" onclick="switchView('settings')">설정</li>
       </ul>
       <div style="position:absolute;bottom:20px;left:0;right:0;padding:0 20px;">
         <div style="font-size:11px;color:#888;margin-bottom:8px;cursor:pointer;" onclick="openChangelog()">
@@ -608,6 +609,42 @@
       <section class="view" id="view-dashboard">
         <h1>대시보드</h1>
         <div class="empty-view">아직 비어있어요</div>
+      </section>
+
+      <!-- 설정 -->
+      <section class="view" id="view-settings">
+        <h1>설정</h1>
+
+        <!-- 로그인 권한 -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">로그인 권한</span>
+          </div>
+          <div style="font-size:13px;color:#666;padding:8px 0;">
+            <div style="margin-bottom:8px;">현재 사용자 이름 (유저메모 편집 시 표시)</div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input type="text" id="settings-username" placeholder="이름 입력" style="padding:6px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px;width:200px;" />
+              <button class="btn-run" onclick="saveUsername()">저장</button>
+            </div>
+            <div id="settings-username-msg" style="font-size:12px;color:#999;margin-top:6px;"></div>
+          </div>
+        </div>
+
+        <!-- 슬랙 태그 대상 -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">슬랙 태그 대상</span>
+          </div>
+          <div style="font-size:13px;color:#666;padding:8px 0;">
+            <div style="margin-bottom:8px;">유저메모 편집 알림 시 멘션할 Slack 사용자 ID</div>
+            <div id="slack-tag-list" style="margin-bottom:10px;"></div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input type="text" id="slack-tag-input" placeholder="Slack User ID (U로 시작)" style="padding:6px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px;width:200px;" />
+              <button class="btn-run" onclick="addSlackTag()">추가</button>
+            </div>
+            <div style="font-size:11px;color:#aaa;margin-top:6px;">Slack 프로필 > 더보기 > 멤버 ID 복사에서 확인</div>
+          </div>
+        </div>
       </section>
     </main>
   </div>
@@ -1885,6 +1922,73 @@
         }
       } catch {}
     }, 5000);
+
+    // --- 설정: 사용자 이름 ---
+    (function() {
+      const saved = localStorage.getItem('editorName') || '';
+      const input = document.getElementById('settings-username');
+      if (input) input.value = saved;
+    })();
+
+    function saveUsername() {
+      const name = document.getElementById('settings-username').value.trim();
+      if (!name) { alert('이름을 입력해주세요'); return; }
+      localStorage.setItem('editorName', name);
+      document.getElementById('settings-username-msg').textContent = '저장됨';
+      setTimeout(() => { document.getElementById('settings-username-msg').textContent = ''; }, 2000);
+    }
+
+    // --- 설정: 슬랙 태그 대상 ---
+    async function loadSlackTags() {
+      try {
+        const res = await fetch('/api/config/slack-tags');
+        const tags = await res.json();
+        renderSlackTags(tags);
+      } catch {}
+    }
+
+    function renderSlackTags(tags) {
+      const list = document.getElementById('slack-tag-list');
+      if (!tags || tags.length === 0) {
+        list.innerHTML = '<div style="color:#aaa;font-size:12px;">등록된 태그 대상 없음</div>';
+        return;
+      }
+      list.innerHTML = tags.map((id, i) => `
+        <div style="display:flex;align-items:center;gap:8px;padding:5px 10px;background:#f5f5f5;border-radius:5px;margin-bottom:4px;font-size:13px;">
+          <span style="font-family:monospace;">${id}</span>
+          <button onclick="removeSlackTag(${i})" style="margin-left:auto;background:none;border:none;color:#999;cursor:pointer;font-size:16px;">&times;</button>
+        </div>
+      `).join('');
+    }
+
+    async function addSlackTag() {
+      const input = document.getElementById('slack-tag-input');
+      const id = input.value.trim();
+      if (!id) return;
+      const res = await fetch('/api/config/slack-tags');
+      const tags = await res.json();
+      if (tags.includes(id)) { alert('이미 등록됨'); return; }
+      tags.push(id);
+      await fetch('/api/config/slack-tags', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tagTargets: tags }),
+      });
+      input.value = '';
+      renderSlackTags(tags);
+    }
+
+    async function removeSlackTag(idx) {
+      const res = await fetch('/api/config/slack-tags');
+      const tags = await res.json();
+      tags.splice(idx, 1);
+      await fetch('/api/config/slack-tags', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tagTargets: tags }),
+      });
+      renderSlackTags(tags);
+    }
+
+    loadSlackTags();
 
     // --- AIM 키워드 설정 모달 ---
     async function openAimKeywords() {

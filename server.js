@@ -665,6 +665,19 @@ app.post('/api/config/set', (req, res) => {
   res.json({ ok: true, path: keyPath, value });
 });
 
+// 슬랙 태그 대상 API
+app.get('/api/config/slack-tags', (req, res) => {
+  res.json(config.slack && config.slack.tagTargets || []);
+});
+
+app.post('/api/config/slack-tags', (req, res) => {
+  const { tagTargets } = req.body;
+  if (!config.slack) config.slack = {};
+  config.slack.tagTargets = tagTargets || [];
+  saveConfig();
+  res.json({ ok: true, tagTargets: config.slack.tagTargets });
+});
+
 app.delete('/api/aim/keywords/:idx', (req, res) => {
   const idx = parseInt(req.params.idx);
   if (!config.aimKeywords || idx < 0 || idx >= config.aimKeywords.length) {
@@ -876,8 +889,10 @@ async function runWfBlocks(blocks) {
           : `${typeLabel} ${totalCount}건`;
         console.log(`[워크플로] 유저메모 편집 대기 (${countDesc})`);
         const dashboardUrl = `http://192.168.0.185:${PORT}/memoGate.html?memoType=${memoType}&memoFilter=${memoFilter}`;
+        const tagTargets = (config.slack && config.slack.tagTargets || []).map(id => `<@${id}>`).join(' ');
+        const tagLine = tagTargets ? `\n${tagTargets}` : '';
         await sendSlackNotification(
-          `:memo: *유저메모 편집이 필요합니다*\n${countDesc}`,
+          `:memo: *유저메모 편집이 필요합니다*\n${countDesc}${tagLine}`,
           dashboardUrl
         );
         // 대기
@@ -987,9 +1002,10 @@ app.post('/api/wf/pending/accept', (req, res) => {
   if (!wfPendingTask) return res.json({ ok: false, message: '대기 중인 작업 없음' });
   if (wfPendingTask.editing) return res.json({ ok: false, message: '다른 기기에서 이미 편집을 시���했습니다.' });
   wfPendingTask.editing = true;
-  const editor = req.body && req.body.name || req.headers['x-forwarded-for'] || req.connection.remoteAddress || '알 수 ��음';
+  const editor = req.body && req.body.name || req.headers['x-forwarded-for'] || req.connection.remoteAddress || '알 수 없음';
   wfPendingTask.editor = editor;
   console.log(`[워크플로] 유저메모 편집 수락 — ${editor}`);
+  sendSlackNotification(`:pencil2: *${editor}* 님이 유저메모 편집을 시작했습니다.`);
   res.json({ ok: true });
 });
 
