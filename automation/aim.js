@@ -189,8 +189,22 @@ async function runAimForType(type) {
         const result = await processOne(page, target, sheets, spreadsheetId, monthlyTab, statusColLetter, memoColLetter, tag, type);
         counters[result] = (counters[result] || 0) + 1;
       } catch (e) {
-        console.error(`${tag} 에러: ${e.message}`);
-        counters.error++;
+        // navigation interrupted → 페이지 안정화 후 1회 재시도
+        if (/interrupted.*navigation/i.test(e.message)) {
+          console.log(`${tag} 네비게이션 충돌 → 대기 후 재시도`);
+          try { await page.waitForLoadState('domcontentloaded', { timeout: 5000 }); } catch {}
+          await page.waitForTimeout(1000);
+          try {
+            const result = await processOne(page, target, sheets, spreadsheetId, monthlyTab, statusColLetter, memoColLetter, tag, type);
+            counters[result] = (counters[result] || 0) + 1;
+          } catch (e2) {
+            console.error(`${tag} 재시도 에러: ${e2.message}`);
+            counters.error++;
+          }
+        } else {
+          console.error(`${tag} 에러: ${e.message}`);
+          counters.error++;
+        }
       }
     }
   } finally {
@@ -461,7 +475,9 @@ async function processOne(page, target, sheets, spreadsheetId, monthlyTab, statu
   if (aimResult === 'aimed') {
     await updateSheet(sheets, spreadsheetId, monthlyTab, statusColLetter, target.rowNum, '매칭중');
     console.log(`${tag} AIM 성공 → "매칭중"`);
-    await page.waitForTimeout(2000);
+    // AIM 성공 후 어드민이 상세 페이지로 리다이렉트할 수 있음 → 네비게이션 완료 대기
+    try { await page.waitForLoadState('domcontentloaded', { timeout: 5000 }); } catch {}
+    await page.waitForTimeout(1000);
     return 'aimed';
   }
 
