@@ -577,10 +577,17 @@
 
       // "전체" 모드 (autoNext=true)이고 신규 완료 시 → 재매칭으로 자동 이동
       const autoNext = params.get('autoNext') === 'true';
+      const fromWorkflow = params.get('fromWorkflow') === 'true';
       if (autoNext && type === 'new') {
         const filterParam = params.get('filter') || 'all';
-        window.location.href = `/userMemo.html?type=rematch&filter=${filterParam}&autoNext=true`;
+        const wfParam = fromWorkflow ? '&fromWorkflow=true' : '';
+        window.location.href = `/userMemo.html?type=rematch&filter=${filterParam}&autoNext=true${wfParam}`;
         return;
+      }
+
+      // 워크플로에서 온 경우 완료 신호
+      if (fromWorkflow) {
+        fetch('/api/wf/pending/complete', { method: 'POST' });
       }
 
       const ds = document.getElementById('done-screen');

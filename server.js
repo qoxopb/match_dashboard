@@ -862,15 +862,55 @@ let wfPendingTask = null;
 
 app.get('/api/wf/pending', (req, res) => {
   if (wfPendingTask) {
-    res.json({ pending: true, type: wfPendingTask.type, filter: wfPendingTask.filter });
+    res.json({ pending: true, type: wfPendingTask.type, filter: wfPendingTask.filter, editing: wfPendingTask.editing || false });
   } else {
     res.json({ pending: false });
   }
 });
 
+app.post('/api/wf/pending/register', (req, res) => {
+  if (wfPendingTask) {
+    wfPendingTask.registered = (wfPendingTask.registered || 0) + 1;
+    console.log(`[워크플로] 유저메모 랜딩 열림 (등록: ${wfPendingTask.registered})`);
+  }
+  res.json({ ok: true });
+});
+
+app.post('/api/wf/pending/unregister', (req, res) => {
+  if (wfPendingTask && wfPendingTask.registered > 0) {
+    wfPendingTask.registered--;
+  }
+  res.json({ ok: true });
+});
+
+app.post('/api/wf/pending/accept', (req, res) => {
+  if (!wfPendingTask) return res.json({ ok: false, message: '대기 중인 작업 없음' });
+  if (wfPendingTask.editing) return res.json({ ok: false, message: '다른 기기에서 이미 편집을 시작했습니다.' });
+  wfPendingTask.editing = true;
+  console.log('[워크플로] 유저메모 편집 수락 — 편집 시작');
+  res.json({ ok: true });
+});
+
+app.post('/api/wf/pending/reject', (req, res) => {
+  if (wfPendingTask) {
+    wfPendingTask.rejected = (wfPendingTask.rejected || 0) + 1;
+    if (wfPendingTask.registered > 0) wfPendingTask.registered--;
+    console.log(`[워크플로] 유저메모 편집 거절 (거절: ${wfPendingTask.rejected}, 남은 등록: ${wfPendingTask.registered})`);
+    // 모두 거절 → 대기 취소
+    if (wfPendingTask.registered <= 0 && !wfPendingTask.editing) {
+      console.log('[워크플로] 모든 사용자 거절 → 유저메모 편집 건너뜀');
+      if (wfPendingTask.resolve) wfPendingTask.resolve();
+      wfPendingTask = null;
+    }
+  }
+  res.json({ ok: true });
+});
+
 app.post('/api/wf/pending/complete', (req, res) => {
   if (wfPendingTask && wfPendingTask.resolve) {
+    console.log('[워크플로] 유저메모 편집 완료 → 워크플로 재개');
     wfPendingTask.resolve();
+    wfPendingTask = null;
     res.json({ ok: true });
   } else {
     res.json({ ok: false, message: '대기 중인 작업 없음' });

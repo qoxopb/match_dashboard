@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>유저메모 편집 요청</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, 'Segoe UI', sans-serif;
+      background: #f0f2f5; color: #333;
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh;
+    }
+    .card {
+      background: #fff; border-radius: 16px; padding: 40px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.1);
+      max-width: 480px; width: 90%; text-align: center;
+    }
+    .icon { font-size: 48px; margin-bottom: 16px; }
+    .title { font-size: 20px; font-weight: 700; margin-bottom: 12px; }
+    .desc {
+      font-size: 13px; color: #666; line-height: 1.7; margin-bottom: 24px;
+      text-align: left; background: #f5f5f5; padding: 14px; border-radius: 8px;
+    }
+    .type-badge {
+      display: inline-block; font-size: 13px; padding: 4px 12px;
+      border-radius: 12px; font-weight: 600; margin-bottom: 20px;
+    }
+    .type-new { background: #e3f2fd; color: #1565c0; }
+    .type-rematch { background: #fff3e0; color: #e65100; }
+    .type-all { background: #e8f5e9; color: #2e7d32; }
+    .buttons { display: flex; gap: 12px; justify-content: center; }
+    button {
+      padding: 12px 28px; border: none; border-radius: 8px;
+      font-size: 15px; font-weight: 600; cursor: pointer; transition: all .15s;
+    }
+    button:hover { filter: brightness(0.93); }
+    .btn-accept { background: #1976d2; color: #fff; }
+    .btn-reject { background: #eee; color: #666; }
+    .msg {
+      font-size: 14px; color: #999; margin-top: 20px; line-height: 1.6;
+    }
+    .msg.error { color: #e53935; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon" id="icon">&#9998;</div>
+    <div class="title" id="title">유저메모 편집 요청</div>
+    <div id="type-badge-wrap"></div>
+    <div class="desc">
+      이 페이지는 매칭 자동화 워크플로 스케줄 실행 중 유저메모 편집 작업이 필요하여 표시되었습니다.<br><br>
+      편집을 시작하면 유저메모 편집 페이지로 이동합니다.<br>
+      거절하면 이 창이 닫힙니다.
+    </div>
+    <div class="buttons" id="buttons">
+      <button class="btn-accept" onclick="accept()">편집 시작</button>
+      <button class="btn-reject" onclick="reject()">거절</button>
+    </div>
+    <div class="msg" id="msg"></div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const memoType = params.get('memoType') || 'all';
+    const memoFilter = params.get('memoFilter') || 'initial';
+
+    const typeLabels = { new: '신규', rematch: '재매칭', all: '전체' };
+    const typeClasses = { new: 'type-new', rematch: 'type-rematch', all: 'type-all' };
+    document.getElementById('type-badge-wrap').innerHTML =
+      `<span class="type-badge ${typeClasses[memoType] || 'type-all'}">${typeLabels[memoType] || memoType} 유저메모</span>`;
+
+    // 등록
+    fetch('/api/wf/pending/register', { method: 'POST' });
+
+    // 상태 폴링 — 다른 사람이 이미 수락했는지 확인
+    const pollInterval = setInterval(async () => {
+      try {
+        const res = await fetch('/api/wf/pending');
+        const data = await res.json();
+        if (!data.pending) {
+          // 대기 취소됨 (모두 거절 또는 완료)
+          clearInterval(pollInterval);
+          document.getElementById('icon').textContent = '✕';
+          document.getElementById('title').textContent = '작업이 종료되었습니다';
+          document.getElementById('buttons').style.display = 'none';
+          document.getElementById('msg').textContent = '이 창을 닫아주세요.';
+          setTimeout(() => { window.close(); }, 2000);
+          return;
+        }
+        if (data.editing) {
+          clearInterval(pollInterval);
+          document.getElementById('icon').textContent = '&#128221;';
+          document.getElementById('title').textContent = '다른 기기에서 편집 중';
+          document.getElementById('buttons').style.display = 'none';
+          document.getElementById('msg').textContent = '다른 사용자가 유저메모를 편집하고 있습니다. 이 창을 닫아주세요.';
+          setTimeout(() => { window.close(); }, 3000);
+        }
+      } catch {}
+    }, 3000);
+
+    async function accept() {
+      const res = await fetch('/api/wf/pending/accept', { method: 'POST' });
+      const data = await res.json();
+      if (data.ok) {
+        clearInterval(pollInterval);
+        // 유저메모 편집 페이지로 이동
+        const filterParam = memoFilter === 'initial' ? '&filter=initial' : '';
+        const url = memoType === 'all'
+          ? `/userMemo.html?type=new${filterParam}&autoNext=true&fromWorkflow=true`
+          : `/userMemo.html?type=${memoType}${filterParam}&fromWorkflow=true`;
+        location.href = url;
+      } else {
+        document.getElementById('msg').className = 'msg error';
+        document.getElementById('msg').textContent = data.message || '다른 기기에서 이미 편집을 시작했습니다.';
+        document.getElementById('buttons').innerHTML = '<button class="btn-reject" onclick="window.close()">닫기</button>';
+      }
+    }
+
+    async function reject() {
+      await fetch('/api/wf/pending/reject', { method: 'POST' });
+      window.close();
+      // window.close()가 안 될 수 있음
+      document.getElementById('buttons').style.display = 'none';
+      document.getElementById('msg').textContent = '거절했습니다. 이 창을 닫아주세요.';
+    }
+
+    // 창 닫힐 때 등록 해제
+    window.addEventListener('beforeunload', () => {
+      navigator.sendBeacon('/api/wf/pending/unregister');
+    });
+  </script>
+</body>
+</html>
