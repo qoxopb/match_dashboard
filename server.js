@@ -650,6 +650,21 @@ app.post('/api/aim/keywords', (req, res) => {
   res.json({ ok: true, keywords: config.aimKeywords });
 });
 
+// config 값 설정 API
+app.post('/api/config/set', (req, res) => {
+  const { path: keyPath, value } = req.body;
+  if (!keyPath) return res.status(400).json({ error: 'path 필수' });
+  const keys = keyPath.split('.');
+  let obj = config;
+  for (let i = 0; i < keys.length - 1; i++) {
+    if (!obj[keys[i]]) obj[keys[i]] = {};
+    obj = obj[keys[i]];
+  }
+  obj[keys[keys.length - 1]] = value;
+  saveConfig();
+  res.json({ ok: true, path: keyPath, value });
+});
+
 app.delete('/api/aim/keywords/:idx', (req, res) => {
   const idx = parseInt(req.params.idx);
   if (!config.aimKeywords || idx < 0 || idx >= config.aimKeywords.length) {
