@@ -42,12 +42,41 @@
       const pendingData = await pendingRes.json();
 
       if (!pendingData.pending) {
-        showBlock('&#10003;', '편집 작업이 없습니다', '대기 중인 유저메모 편집이 없습니다.', 3);
+        showBlock('&#10003;', '편�� 작업이 없습니다', '대기 중인 유저메모 편집이 없습니다.', 3);
         return;
       }
 
+      // 사용자 선택
+      let name = '';
+      try {
+        const tagsRes = await fetch('/api/config/slack-tags');
+        const tags = await tagsRes.json();
+        if (tags.length > 0) {
+          const names = tags.map(t => typeof t === 'string' ? t : t.name);
+          const saved = localStorage.getItem('editorName') || '';
+          const selected = names.includes(saved) ? saved : null;
+          if (!selected) {
+            document.getElementById('icon').innerHTML = '&#9998;';
+            document.getElementById('title').textContent = '누구세요?';
+            document.getElementById('msg').innerHTML = names.map(n =>
+              `<button onclick="selectAndAccept('${n}')" style="display:block;width:100%;padding:10px;margin-bottom:8px;border:1px solid #ddd;border-radius:8px;background:#fff;font-size:14px;cursor:pointer;text-align:center;">${n}</button>`
+            ).join('');
+            return;
+          }
+          name = saved;
+        }
+      } catch {}
+
+      await doAccept(name);
+    }
+
+    async function selectAndAccept(name) {
+      localStorage.setItem('editorName', name);
+      await doAccept(name);
+    }
+
+    async function doAccept(name) {
       // accept 시도
-      const name = localStorage.getItem('editorName') || '';
       const acceptRes = await fetch('/api/wf/pending/accept', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name }),

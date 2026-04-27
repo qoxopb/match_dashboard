@@ -618,16 +618,9 @@
         <!-- 로그인 권한 -->
         <div class="card">
           <div class="card-header">
-            <span class="card-title">로그인 권한</span>
+            <span class="card-title">로���인 권한</span>
           </div>
-          <div style="font-size:13px;color:#666;padding:8px 0;">
-            <div style="margin-bottom:8px;">현재 사용자 이름 (유저메모 편집 시 표시)</div>
-            <div style="display:flex;gap:8px;align-items:center;">
-              <input type="text" id="settings-username" placeholder="이름 입력" style="padding:6px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px;width:200px;" />
-              <button class="btn-run" onclick="saveUsername()">저장</button>
-            </div>
-            <div id="settings-username-msg" style="font-size:12px;color:#999;margin-top:6px;"></div>
-          </div>
+          <div style="font-size:13px;color:#999;padding:8px 0;">Google 계정 인�� (추후 구현)</div>
         </div>
 
         <!-- 슬랙 태그 대상 -->
@@ -1862,21 +1855,6 @@
         ? `/userMemo.html?type=new${filterParam}&autoNext=true`
         : `/userMemo.html?type=${memoType}${filterParam}`;
       return window.open(url, '_blank', `width=${screen.availWidth},height=${screen.availHeight},left=0,top=0`);
-    }
-
-    // --- 설정: 사용자 이름 ---
-    (function() {
-      const saved = localStorage.getItem('editorName') || '';
-      const input = document.getElementById('settings-username');
-      if (input) input.value = saved;
-    })();
-
-    function saveUsername() {
-      const name = document.getElementById('settings-username').value.trim();
-      if (!name) { alert('이름을 입력해주세요'); return; }
-      localStorage.setItem('editorName', name);
-      document.getElementById('settings-username-msg').textContent = '저장됨';
-      setTimeout(() => { document.getElementById('settings-username-msg').textContent = ''; }, 2000);
     }
 
     // --- 설정: 슬랙 태그 대상 ---
