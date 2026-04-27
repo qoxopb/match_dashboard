@@ -1328,9 +1328,11 @@
       } catch { _wfSchedCache = []; }
     }
 
+    let _dragPresetIdx = null;
+
     function renderPresetList() {
       const list = document.getElementById('wf-preset-list');
-      list.innerHTML = wfPresets.map(p => {
+      list.innerHTML = wfPresets.map((p, idx) => {
         let blocks = [];
         try {
           const d = JSON.parse(localStorage.getItem(WF_DATA_PREFIX + p.id) || '{}');
@@ -1348,7 +1350,11 @@
         else metaText = `블록 ${total}개`;
         const playBtn = hasSchedule ? `<button class="wf-preset-play" onclick="event.stopPropagation();togglePresetSchedules('${p.id}',${!isActive})" title="${isActive ? '일시정지' : '재생'}" style="background:none;border:none;cursor:pointer;font-size:16px;padding:2px 4px;color:${isActive ? '#43a047' : '#999'};">${isActive ? '&#10074;&#10074;' : '&#9654;'}</button>` : '';
         return `
-          <div class="wf-preset-item ${p.id === wfCurrentId ? 'active' : ''}" onclick="selectPreset('${p.id}')">
+          <div class="wf-preset-item ${p.id === wfCurrentId ? 'active' : ''}" draggable="true"
+               ondragstart="_dragPresetIdx=${idx};event.dataTransfer.effectAllowed='move';"
+               ondragover="event.preventDefault();presetDragOver(event,${idx});"
+               ondrop="presetDrop(${idx})"
+               onclick="selectPreset('${p.id}')">
             <div style="flex:1;min-width:0;">
               <div class="wf-preset-name">${escapeHtml(p.name)}</div>
               <div class="wf-preset-meta">${escapeHtml(metaText)}</div>
@@ -1358,6 +1364,29 @@
           </div>
         `;
       }).join('');
+    }
+
+    function presetDragOver(e, idx) {
+      const items = document.querySelectorAll('.wf-preset-item');
+      items.forEach(el => el.style.borderTop = '');
+      items.forEach(el => el.style.borderBottom = '');
+      const rect = items[idx].getBoundingClientRect();
+      if (e.clientY < rect.top + rect.height / 2) {
+        items[idx].style.borderTop = '2px solid #1976d2';
+      } else {
+        items[idx].style.borderBottom = '2px solid #1976d2';
+      }
+    }
+
+    function presetDrop(targetIdx) {
+      document.querySelectorAll('.wf-preset-item').forEach(el => { el.style.borderTop = ''; el.style.borderBottom = ''; });
+      if (_dragPresetIdx === null || _dragPresetIdx === targetIdx) return;
+      const item = wfPresets.splice(_dragPresetIdx, 1)[0];
+      const adj = _dragPresetIdx < targetIdx ? targetIdx : targetIdx;
+      wfPresets.splice(adj, 0, item);
+      _dragPresetIdx = null;
+      savePresetIndex();
+      renderPresetList();
     }
 
     async function togglePresetSchedules(presetId, enable) {
