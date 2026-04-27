@@ -1812,44 +1812,79 @@
     setInterval(() => { fetchLogs(); fetchSchedules(); }, 3000);
 
     // --- 워크플로 대기 작업 알림 (서버 스케줄 실행 시) ---
+    // --- 워크플로 유저메모 대기 알림 ---
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
     }
     let _wfPendingNotifyInterval = null;
     let _wfPendingPopup = null;
+    let _wfPendingBannerShown = false;
+
+    function showPendingBanner(data) {
+      if (_wfPendingBannerShown) return;
+      _wfPendingBannerShown = true;
+      let banner = document.getElementById('wf-pending-banner');
+      if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'wf-pending-banner';
+        banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#e53935;color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:center;gap:12px;font-size:14px;font-weight:500;box-shadow:0 2px 8px rgba(0,0,0,.3);';
+        document.body.prepend(banner);
+      }
+      const typeLabel = { new: '신규', rematch: '재매칭', all: '전체' }[data.type] || data.type;
+      banner.innerHTML = `<span>워크플로 대기 중 — ${typeLabel} 유저메모 편집이 필요합니다</span><button onclick="openPendingMemo()" style="background:#fff;color:#e53935;border:none;padding:8px 16px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">유저메모 편집 열기</button>`;
+      banner.style.display = 'flex';
+    }
+
+    function hidePendingBanner() {
+      _wfPendingBannerShown = false;
+      const banner = document.getElementById('wf-pending-banner');
+      if (banner) banner.style.display = 'none';
+    }
+
+    let _pendingData = null;
+
+    function openPendingMemo() {
+      if (!_pendingData) return;
+      if (_wfPendingPopup && !_wfPendingPopup.closed) { _wfPendingPopup.focus(); return; }
+      _wfPendingPopup = openMemoPopup(_pendingData.type, _pendingData.filter || 'initial');
+      const check = setInterval(() => {
+        if (_wfPendingPopup.closed) {
+          clearInterval(check);
+          fetch('/api/wf/pending/complete', { method: 'POST' });
+          _wfPendingPopup = null;
+          hidePendingBanner();
+        }
+      }, 1000);
+    }
 
     function sendWfPendingNotification(data) {
       if (Notification.permission !== 'granted') return;
       const typeLabel = { new: '신규', rematch: '재매칭', all: '전체' }[data.type] || data.type;
       const n = new Notification('유저메모 편집 필요', {
-        body: `${typeLabel} 유저메모 편집을 기다리고 있습니다.`,
+        body: `${typeLabel} 유저메모 편집을 기다리고 있습니다. 클릭하여 열기`,
         requireInteraction: true,
       });
-      n.onclick = () => {
-        n.close();
-        window.focus();
-        if (_wfPendingPopup && !_wfPendingPopup.closed) { _wfPendingPopup.focus(); return; }
-        _wfPendingPopup = openMemoPopup(data.type, data.filter || 'initial');
-        const check = setInterval(() => {
-          if (_wfPendingPopup.closed) {
-            clearInterval(check);
-            fetch('/api/wf/pending/complete', { method: 'POST' });
-            _wfPendingPopup = null;
-          }
-        }, 1000);
-      };
+      n.onclick = () => { n.close(); window.focus(); openPendingMemo(); };
     }
 
     setInterval(async () => {
       try {
         const res = await fetch('/api/wf/pending');
         const data = await res.json();
-        if (data.pending && !_wfPendingNotifyInterval) {
-          sendWfPendingNotification(data);
-          _wfPendingNotifyInterval = setInterval(() => sendWfPendingNotification(data), 60000);
-        } else if (!data.pending && _wfPendingNotifyInterval) {
-          clearInterval(_wfPendingNotifyInterval);
-          _wfPendingNotifyInterval = null;
+        if (data.pending) {
+          _pendingData = data;
+          showPendingBanner(data);
+          if (!_wfPendingNotifyInterval) {
+            sendWfPendingNotification(data);
+            _wfPendingNotifyInterval = setInterval(() => sendWfPendingNotification(data), 60000);
+          }
+        } else {
+          _pendingData = null;
+          hidePendingBanner();
+          if (_wfPendingNotifyInterval) {
+            clearInterval(_wfPendingNotifyInterval);
+            _wfPendingNotifyInterval = null;
+          }
         }
       } catch {}
     }, 5000);
