@@ -926,8 +926,13 @@ async function sendSlackNotification(text, url) {
     const res = await axios.post('https://slack.com/api/chat.postMessage', payload, {
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     });
-    console.log(`[Slack] 알림 전송: ${text.substring(0, 60)}`);
-    return res.data.ok ? { channel, ts: res.data.ts } : null;
+    if (res.data.ok) {
+      console.log(`[Slack] 알림 전송 성공: ${text.substring(0, 60)}`);
+      return { channel, ts: res.data.ts };
+    } else {
+      console.error(`[Slack] 알림 전송 실패: ${res.data.error}`);
+      return null;
+    }
   } catch (e) {
     console.error(`[Slack] 알림 실패: ${e.message}`);
     return null;
