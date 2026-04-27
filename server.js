@@ -134,6 +134,29 @@ function saveSchedulesToFile() {
   try { fs.writeFileSync(schedulesPath, JSON.stringify(data, null, 2), 'utf-8'); } catch {}
 }
 
+function getNextRunTime(type, options) {
+  const now = new Date();
+  if (type === 'interval') {
+    const mins = options.minutes;
+    const nextMin = Math.ceil((now.getMinutes() + 1) / mins) * mins;
+    const next = new Date(now);
+    next.setMinutes(nextMin, 0, 0);
+    if (next <= now) next.setMinutes(next.getMinutes() + mins);
+    return next.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+  }
+  if (type === 'alarm') {
+    const hh = String(options.hour).padStart(2, '0');
+    const mm = String(options.minute).padStart(2, '0');
+    return `${hh}:${mm}`;
+  }
+  if (type === 'date') {
+    const hh = String(options.hour).padStart(2, '0');
+    const mm = String(options.minute).padStart(2, '0');
+    return `${options.dateStr || ''} ${hh}:${mm}`;
+  }
+  return '?';
+}
+
 function loadSchedulesFromFile() {
   try {
     const data = JSON.parse(fs.readFileSync(schedulesPath, 'utf-8'));
@@ -141,7 +164,10 @@ function loadSchedulesFromFile() {
     for (const s of data) {
       if (s.id > maxId) maxId = s.id;
       const restored = addSchedule(s.jobId, s.type, s.options, s.id, s.enabled, true);
-      if (restored) console.log(`[스케줄] 복원: ${s.label} (${s.enabled ? 'ON' : 'OFF'})`);
+      if (restored) {
+        const nextLabel = s.enabled ? getNextRunTime(s.type, s.options) : '비활성';
+        console.log(`[스케줄] 복원: ${s.jobId} — ${s.label} (${s.enabled ? 'ON' : 'OFF'}) → 다음 실행: ${nextLabel}`);
+      }
     }
     if (maxId >= scheduleIdCounter) scheduleIdCounter = maxId + 1;
   } catch {}
