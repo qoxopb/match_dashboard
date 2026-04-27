@@ -54,6 +54,9 @@
       편집을 시작하면 유저메모 편집 페이지로 이동합니다.<br>
       거절하면 이 창이 닫힙니다.
     </div>
+    <div style="margin-bottom:16px;">
+      <input type="text" id="editor-name" placeholder="이름 입력" style="padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;width:200px;text-align:center;">
+    </div>
     <div class="buttons" id="buttons">
       <button class="btn-accept" onclick="accept()">편집 시작</button>
       <button class="btn-reject" onclick="reject()">거절</button>
@@ -70,6 +73,10 @@
     const typeClasses = { new: 'type-new', rematch: 'type-rematch', all: 'type-all' };
     document.getElementById('type-badge-wrap').innerHTML =
       `<span class="type-badge ${typeClasses[memoType] || 'type-all'}">${typeLabels[memoType] || memoType} 유저메모</span>`;
+
+    // 저장된 이름 복원
+    const savedName = localStorage.getItem('editorName');
+    if (savedName) document.getElementById('editor-name').value = savedName;
 
     // 등록
     fetch('/api/wf/pending/register', { method: 'POST' });
@@ -101,7 +108,13 @@
     }, 3000);
 
     async function accept() {
-      const res = await fetch('/api/wf/pending/accept', { method: 'POST' });
+      const name = document.getElementById('editor-name').value.trim();
+      if (!name) { alert('이름을 입력해주세요'); return; }
+      localStorage.setItem('editorName', name);
+      const res = await fetch('/api/wf/pending/accept', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
       const data = await res.json();
       if (data.ok) {
         clearInterval(pollInterval);

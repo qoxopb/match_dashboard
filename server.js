@@ -851,13 +851,20 @@ async function runWfBlocks(blocks) {
       const typeLabel = { new: '신규', rematch: '재매칭', all: '전체' }[memoType] || memoType;
 
       // 편집 대상 건수 체크
-      const memoCount = await countMemoTargets(memoType, memoFilter);
-      if (memoCount === 0) {
+      const memoCounts = await countMemoTargetsByType(memoType, memoFilter);
+      const totalCount = memoCounts.new + memoCounts.rematch;
+      if (totalCount === 0) {
         console.log(`[워크플로] 유저메모 편집 대상 0건 → 건너뜀`);
       } else {
-        console.log(`[워크플로] 유저메모 편집 대기 (${typeLabel}, ${memoCount}건)`);
-        // Slack 알림
-        await sendSlackNotification(`${typeLabel} 유저메모 편집이 필요합니다 (${memoCount}건)\n대시보드에서 편집을 시작해주세요.`);
+        const countDesc = memoType === 'all'
+          ? `신규 ${memoCounts.new}건 / 재매칭 ${memoCounts.rematch}건`
+          : `${typeLabel} ${totalCount}건`;
+        console.log(`[워크플로] 유저메모 편집 대기 (${countDesc})`);
+        const dashboardUrl = `http://192.168.0.185:${PORT}/memoLanding.html?memoType=${memoType}&memoFilter=${memoFilter}`;
+        await sendSlackNotification(
+          `:memo: *유저메모 편집이 필요합니다*\n${countDesc}\n아래 버튼을 눌러 편집을 시작해주세요.`,
+          dashboardUrl
+        );
         // 대기
         wfPendingTask = { type: memoType, filter: memoFilter, createdAt: Date.now() };
         await new Promise(resolve => { wfPendingTask.resolve = resolve; });
@@ -871,25 +878,39 @@ async function runWfBlocks(blocks) {
 // --- Slack 알림 ---
 const axios = require('axios');
 
-async function sendSlackNotification(text) {
+async function sendSlackNotification(text, url) {
   try {
     const token = config.slack && config.slack.botToken;
-    const channel = config.slack && config.slack.notifyChannelId || config.slack && config.slack.channelId;
+    const channel = (config.slack && config.slack.notifyChannelId) || (config.slack && config.slack.channelId);
     if (!token || !channel) { console.log('[Slack] 토큰/채널 미설정 → 알림 생략'); return; }
+    const blocks = [
+      { type: 'section', text: { type: 'mrkdwn', text } },
+    ];
+    if (url) {
+      blocks.push({
+        type: 'actions',
+        elements: [{
+          type: 'button',
+          text: { type: 'plain_text', text: '유저메모 편집 열기' },
+          url,
+          style: 'primary',
+        }],
+      });
+    }
     await axios.post('https://slack.com/api/chat.postMessage', {
-      channel, text,
+      channel, text, blocks,
     }, { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } });
-    console.log(`[Slack] 알림 전송: ${text.substring(0, 50)}`);
+    console.log(`[Slack] 알림 전송: ${text.substring(0, 60)}`);
   } catch (e) {
     console.error(`[Slack] 알림 실패: ${e.message}`);
   }
 }
 
 // --- 유저메모 편집 대상 건수 ---
-async function countMemoTargets(memoType, memoFilter) {
+async function countMemoTargetsByType(memoType, memoFilter) {
   try {
     const sheets = await getSheetsApi();
-    let total = 0;
+    const counts = { new: 0, rematch: 0 };
     const types = memoType === 'all' ? ['new', 'rematch'] : [memoType];
     for (const type of types) {
       const spreadsheetId = config.sheets[type === 'new' ? 'new' : 'rematch'];
@@ -908,20 +929,20 @@ async function countMemoTargets(memoType, memoFilter) {
         if (!matchId) return;
         const sn = statusIdx >= 0 ? (row[statusIdx] || '').replace(/\s+/g, '').toLowerCase() : '';
         if (memoFilter === 'initial') {
-          if (sn === '' || sn === 'ready') total++;
+          if (sn === '' || sn === 'ready') counts[type]++;
         } else {
           if (type === 'new') {
-            if (sn === '' || sn === '매칭중' || sn === '확인필요') total++;
+            if (sn === '' || sn === '매칭중' || sn === '확인필요') counts[type]++;
           } else {
-            if (['', 'ready', '첫수업전재매칭', '일반재매칭', '매칭중', '보류', '확인필요'].includes(sn)) total++;
+            if (['', 'ready', '첫수업전재매칭', '일반재매칭', '매칭중', '보류', '확인필요'].includes(sn)) counts[type]++;
           }
         }
       });
     }
-    return total;
+    return counts;
   } catch (e) {
     console.error(`[countMemoTargets] 에러: ${e.message}`);
-    return 0;
+    return { new: 0, rematch: 0 };
   }
 }
 
@@ -953,9 +974,11 @@ app.post('/api/wf/pending/unregister', (req, res) => {
 
 app.post('/api/wf/pending/accept', (req, res) => {
   if (!wfPendingTask) return res.json({ ok: false, message: '대기 중인 작업 없음' });
-  if (wfPendingTask.editing) return res.json({ ok: false, message: '다른 기기에서 이미 편집을 시작했습니다.' });
+  if (wfPendingTask.editing) return res.json({ ok: false, message: '다른 기기에서 이미 편집을 시���했습니다.' });
   wfPendingTask.editing = true;
-  console.log('[워크플로] 유저메모 편집 수락 — 편집 시작');
+  const editor = req.body && req.body.name || req.headers['x-forwarded-for'] || req.connection.remoteAddress || '알 수 ��음';
+  wfPendingTask.editor = editor;
+  console.log(`[워크플로] 유저메모 편집 수락 — ${editor}`);
   res.json({ ok: true });
 });
 
