@@ -101,6 +101,9 @@ async function runPairing() {
       } catch (e) {
         console.error(`[pairing][W${workerId}] ${target.matchId} 에러: ${e.message}`);
         counters.error++;
+        // 네비게이션 충돌 시 페이지 안정화 대기
+        try { await page.waitForLoadState('domcontentloaded', { timeout: 5000 }); } catch {}
+        await page.waitForTimeout(1000);
       }
     }
   }
