@@ -116,8 +116,8 @@ async function runAimForType(type) {
 
   if (matchIdIdx < 0 || statusIdx < 0) throw new Error('헤더에서 컬럼을 찾을 수 없습니다');
 
-  const excludeNew = ['매칭완료', '동일튜터유지', '동일 튜터 유지', '환불'];
-  const excludeRematch = ['재매칭 완료', '재매칭완료', '환불/소멸', '환불', '소멸'];
+  const excludeNew = ['매칭완료', '동일튜터유지', '동일 튜터 유지', '환불', '보류'];
+  const excludeRematch = ['재매칭 완료', '재매칭완료', '환불/소멸', '환불', '소멸', '보류'];
   const excludeList = (type === 'new' ? excludeNew : excludeRematch).map(norm);
 
   // 메모 컬럼 찾기 (확인필요 시 메모 기재용)
