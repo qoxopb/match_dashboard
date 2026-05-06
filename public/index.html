@@ -254,7 +254,7 @@
     .wf-block:active { cursor: grabbing; }
     .wf-block.cat-prep { background: #4fc3f7; }
     .wf-block.cat-pairing { background: #66bb6a; }
-    .wf-block.cat-aim { background: #ab47bc; }
+    .wf-block.cat-send { background: #ab47bc; }
     .wf-block.cat-status { background: #ff9800; }
     .wf-block.cat-monthly { background: #ec407a; }
     .wf-block.cat-control { background: #607d8b; }
@@ -278,7 +278,7 @@
     }
     .wf-ws-block.cat-prep { background: #4fc3f7; }
     .wf-ws-block.cat-pairing { background: #66bb6a; }
-    .wf-ws-block.cat-aim { background: #ab47bc; }
+    .wf-ws-block.cat-send { background: #ab47bc; }
     .wf-ws-block.cat-status { background: #ff9800; }
     .wf-ws-block.cat-monthly { background: #ec407a; }
     .wf-ws-block.cat-control { background: #607d8b; }
@@ -418,27 +418,27 @@
     </div>
   </div>
 
-  <!-- 매칭 제안 (aim 후 수동) -->
-  <div class="card" id="card-aim">
+  <!-- 매칭 제안 -->
+  <div class="card" id="card-send">
     <div class="card-header">
-      <span class="card-title">매칭 제안 (aim 후 수동)</span>
-      <span class="badge badge-off" id="badge-aim">스케줄 없음</span>
+      <span class="card-title">매칭 제안</span>
+      <span class="badge badge-off" id="badge-send">스케줄 없음</span>
       <button class="btn-run" style="margin-left:auto;font-size:12px;padding:3px 10px;" onclick="openAimKeywords()">설정</button>
     </div>
     <div class="run-section">
       <label>즉시 실행</label>
       <div style="display:flex;gap:6px;">
-        <button class="btn-run" data-run-job="aim:new" onclick="runNow('aim:new')">신규매칭</button>
-        <button class="btn-run" data-run-job="aim:rematch" onclick="runNow('aim:rematch')">재매칭</button>
-        <button class="btn-run" data-run-job="aim" onclick="runNow('aim')">전체</button>
+        <button class="btn-run" data-run-job="send:new" onclick="runNow('send:new')">신규매칭</button>
+        <button class="btn-run" data-run-job="send:rematch" onclick="runNow('send:rematch')">재매칭</button>
+        <button class="btn-run" data-run-job="send" onclick="runNow('send')">전체</button>
       </div>
     </div>
-    <div class="sched-toggle-header" onclick="toggleSched('aim')">
-      <span class="arrow" id="sched-arrow-aim">&#9654;</span>
+    <div class="sched-toggle-header" onclick="toggleSched('send')">
+      <span class="arrow" id="sched-arrow-send">&#9654;</span>
       <span class="label">스케줄 설정</span>
     </div>
-    <div class="sched-body collapsed" id="sched-body-aim">
-      <div class="schedule-section" data-job="aim"></div>
+    <div class="sched-body collapsed" id="sched-body-send">
+      <div class="schedule-section" data-job="send"></div>
     </div>
   </div>
 
@@ -512,10 +512,10 @@
                 <div class="wf-section-title">페어링</div>
                 <div class="wf-block cat-pairing" draggable="true" ondragstart="dragStart(event,'pairing','페어링 생성','pairing')" onclick="addBlock('pairing','페어링 생성','pairing')">페어링 생성</div>
 
-                <div class="wf-section-title">매칭 제안 (AIM)</div>
-                <div class="wf-block cat-aim" draggable="true" ondragstart="dragStart(event,'aim:new','신규 매칭 제안','aim')" onclick="addBlock('aim:new','신규 매칭 제안','aim')">신규 매칭 제안</div>
-                <div class="wf-block cat-aim" draggable="true" ondragstart="dragStart(event,'aim:rematch','재매칭 제안','aim')" onclick="addBlock('aim:rematch','재매칭 제안','aim')">재매칭 제안</div>
-                <div class="wf-block cat-aim" draggable="true" ondragstart="dragStart(event,'aim','전체 매칭 제안','aim')" onclick="addBlock('aim','전체 매칭 제안','aim')">전체 매칭 제안</div>
+                <div class="wf-section-title">매칭 제안</div>
+                <div class="wf-block cat-send" draggable="true" ondragstart="dragStart(event,'send:new','신규 매칭 제안','send')" onclick="addBlock('send:new','신규 매칭 제안','send')">신규 매칭 제안</div>
+                <div class="wf-block cat-send" draggable="true" ondragstart="dragStart(event,'send:rematch','재매칭 제안','send')" onclick="addBlock('send:rematch','재매칭 제안','send')">재매칭 제안</div>
+                <div class="wf-block cat-send" draggable="true" ondragstart="dragStart(event,'send','전체 매칭 제안','send')" onclick="addBlock('send','전체 매칭 제안','send')">전체 매칭 제안</div>
 
                 <div class="wf-section-title">매칭결과 확인</div>
                 <div class="wf-block cat-status" draggable="true" ondragstart="dragStart(event,'statusCheck:new','신규 매칭결과 확인','status')" onclick="addBlock('statusCheck:new','신규 매칭결과 확인','status')">신규 매칭결과 확인</div>
@@ -663,7 +663,7 @@
 
     const DAY_NAMES = ['일','월','화','수','목','금','토'];
     const INTERVALS = [5, 10, 20, 30, 40, 50, 60, 90, 120];
-    const SCHEDULE_JOBS = ['prep', 'pairing', 'aim', 'statusCheck'];
+    const SCHEDULE_JOBS = ['prep', 'pairing', 'send', 'statusCheck'];
 
     // --- 스케줄 UI 렌더링 ---
     function initScheduleSections() {
@@ -888,7 +888,31 @@
     let wfPresets = []; // [{id, name}]
     let wfCurrentId = null;
 
+    function normalizeJobId(jobId) {
+      if (jobId === 'aim') return 'send';
+      if (jobId === 'aim:new') return 'send:new';
+      if (jobId === 'aim:rematch') return 'send:rematch';
+      return jobId;
+    }
+
+    function normalizeWfBlock(block) {
+      if (!block) return block;
+      if (block.kind === 'job') {
+        block.jobId = normalizeJobId(block.jobId);
+        if (block.cat === 'aim') block.cat = 'send';
+      } else if (block.children) {
+        block.children.forEach(normalizeWfBlock);
+      }
+      return block;
+    }
+
+    function normalizeWorkspace(blocks) {
+      return (blocks || []).map(normalizeWfBlock);
+    }
+
     function addBlock(jobId, label, cat) {
+      jobId = normalizeJobId(jobId);
+      if (cat === 'aim') cat = 'send';
       wfWorkspace.push({ kind: 'job', jobId, label, cat });
       renderWorkspace();
     }
@@ -968,6 +992,8 @@
 
     function handleDrop(targetContainerPath, data) {
       if (data.source === 'palette') {
+        data.jobId = normalizeJobId(data.jobId);
+        if (data.cat === 'aim') data.cat = 'send';
         getContainerArray(targetContainerPath).push({ kind: 'job', jobId: data.jobId, label: data.label, cat: data.cat });
       } else if (data.source === 'workspace') {
         const sourcePath = data.path;
@@ -1000,6 +1026,8 @@
         const data = JSON.parse(e.dataTransfer.getData('application/json'));
         const dropIdx = getDropIndex(e);
         if (data.source === 'palette') {
+          data.jobId = normalizeJobId(data.jobId);
+          if (data.cat === 'aim') data.cat = 'send';
           wfWorkspace.splice(dropIdx, 0, { kind: 'job', jobId: data.jobId, label: data.label, cat: data.cat });
         } else if (data.source === 'workspace') {
           const srcPath = data.path;
@@ -1243,9 +1271,9 @@
             <option value='{"jobId":"prep:rematch","label":"재매칭 시트 정리","cat":"prep"}'>재매칭 시트 정리</option>
             <option value='{"jobId":"prep","label":"전체 시트 정리","cat":"prep"}'>전체 시트 정리</option>
             <option value='{"jobId":"pairing","label":"페어링 생성","cat":"pairing"}'>페어링 생성</option>
-            <option value='{"jobId":"aim:new","label":"신규 매칭 제안","cat":"aim"}'>신규 매칭 제안</option>
-            <option value='{"jobId":"aim:rematch","label":"재매칭 제안","cat":"aim"}'>재매칭 제안</option>
-            <option value='{"jobId":"aim","label":"전체 매칭 제안","cat":"aim"}'>전체 매칭 제안</option>
+            <option value='{"jobId":"send:new","label":"신규 매칭 제안","cat":"send"}'>신규 매칭 제안</option>
+            <option value='{"jobId":"send:rematch","label":"재매칭 제안","cat":"send"}'>재매칭 제안</option>
+            <option value='{"jobId":"send","label":"전체 매칭 제안","cat":"send"}'>전체 매칭 제안</option>
             <option value='{"jobId":"statusCheck:new","label":"신규 매칭결과 확인","cat":"status"}'>신규 매칭결과 확인</option>
             <option value='{"jobId":"statusCheck:rematch","label":"재매칭 결과 확인","cat":"status"}'>재매칭 결과 확인</option>
             <option value='{"jobId":"statusCheck","label":"전체 매칭결과 확인","cat":"status"}'>전체 매칭결과 확인</option>
@@ -1429,7 +1457,7 @@
       if (raw) {
         try {
           const data = JSON.parse(raw);
-          wfWorkspace = data.workspace || [];
+          wfWorkspace = normalizeWorkspace(data.workspace);
         } catch { wfWorkspace = []; }
       } else {
         wfWorkspace = [];

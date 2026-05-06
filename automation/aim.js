@@ -93,7 +93,7 @@ function matchSchedules(studentSchedule, tutorSchedule, weekly, hoursNeeded) {
 // --- 메인 ---
 async function runAimForType(type) {
   const label = type === 'new' ? '신규' : '재매칭';
-  console.log(`\n[aim] === ${label} 매칭 제안 시작 ===`);
+  console.log(`\n[send] === ${label} 매칭 제안 시작 ===`);
   const startedAt = Date.now();
 
   const sheets = await getSheetsApi();
@@ -124,7 +124,7 @@ async function runAimForType(type) {
   const memoIdx = header.findIndex(h => norm(h) === '매칭담당자메모' || norm(h) === 'memo');
 
   // 메모 컬럼 디버그
-  console.log(`[aim] 메모 컬럼 위치: ${memoIdx} (헤더: "${memoIdx >= 0 ? header[memoIdx] : 'NOT FOUND'}")`);
+  console.log(`[send] 메모 컬럼 위치: ${memoIdx} (헤더: "${memoIdx >= 0 ? header[memoIdx] : 'NOT FOUND'}")`);
 
   // AIM 키워드 설정 로드
   const aimKeywords = config.aimKeywords || [];
@@ -170,9 +170,9 @@ async function runAimForType(type) {
     }
   });
 
-  if (keywordSkipped > 0) console.log(`[aim] 키워드 제외: ${keywordSkipped}건`);
-  if (aimKeywords.length > 0) console.log(`[aim] 키워드 설정: ${aimKeywords.map(k => `"${k.keyword}"→${k.action}`).join(', ')}`);
-  console.log(`[aim] 대상 ${targets.length}건`);
+  if (keywordSkipped > 0) console.log(`[send] 키워드 제외: ${keywordSkipped}건`);
+  if (aimKeywords.length > 0) console.log(`[send] 키워드 설정: ${aimKeywords.map(k => `"${k.keyword}"→${k.action}`).join(', ')}`);
+  console.log(`[send] 대상 ${targets.length}건`);
   if (targets.length === 0) return;
 
   const statusColLetter = colNumberToLetter(statusIdx);
@@ -183,8 +183,8 @@ async function runAimForType(type) {
 
   try {
     for (const target of targets) {
-      if (shouldAbort()) { console.log(`[aim] 중단됨`); break; }
-      const tag = `[aim] ${target.matchId}`;
+      if (shouldAbort()) { console.log(`[send] 중단됨`); break; }
+      const tag = `[send] ${target.matchId}`;
       try {
         const result = await processOne(page, target, sheets, spreadsheetId, monthlyTab, statusColLetter, memoColLetter, tag, type);
         counters[result] = (counters[result] || 0) + 1;
@@ -214,7 +214,7 @@ async function runAimForType(type) {
   const elapsed = Date.now() - startedAt;
   const mins = Math.floor(elapsed / 60000);
   const secs = Math.floor((elapsed % 60000) / 1000);
-  console.log(`[aim] === ${label} 완료: AIM ${counters.aimed || 0}, 수동 ${counters.manual || 0}, No Data ${counters.noData || 0}, 확인필요 ${counters.needCheck || 0}, 스킵 ${counters.skipped || 0}, 에러 ${counters.error} | ${mins > 0 ? mins + '분 ' : ''}${secs}초 ===`);
+  console.log(`[send] === ${label} 완료: AIM ${counters.aimed || 0}, 수동 ${counters.manual || 0}, No Data ${counters.noData || 0}, 확인필요 ${counters.needCheck || 0}, 스킵 ${counters.skipped || 0}, 에러 ${counters.error} | ${mins > 0 ? mins + '분 ' : ''}${secs}초 ===`);
 }
 
 // --- systemError 처리 헬퍼 ---

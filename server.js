@@ -2,6 +2,7 @@ const express = require('express');
 const cron = require('node-cron');
 const path = require('path');
 const fs = require('fs');
+const { AsyncLocalStorage } = require('async_hooks');
 const notifier = require('node-notifier');
 const config = require('./config.json');
 const { prepNewSheet, prepRematchSheet, createMonthlyTab } = require('./automation/sheetPrep');
@@ -19,6 +20,7 @@ app.use(express.json());
 
 // --- 로그 ---
 const { shouldAbort, requestAbort, resetAbort } = require('./abort');
+const logContext = new AsyncLocalStorage();
 const logs = [];
 let running = null;
 
@@ -34,8 +36,16 @@ function getLogFileName() {
   return path.join(logsDir, `${yy}${mm}${dd}.log`);
 }
 
+function formatLogMessage(msg) {
+  const ctx = logContext.getStore();
+  if (!ctx) return msg;
+  const prefix = `[${ctx.name}]`;
+  return msg.startsWith(prefix) ? msg : `${prefix} ${msg}`;
+}
+
 function addLog(msg) {
   const time = new Date().toLocaleTimeString('ko-KR');
+  msg = formatLogMessage(msg);
   logs.push({ time, msg });
   if (logs.length > 2000) logs.shift();
   // 파일에도 기록
@@ -53,9 +63,9 @@ const JOBS = {
   'prep:new':  { name: '신규 시트 정리', fn: () => prepNewSheet() },
   'prep:rematch': { name: '재매칭 시트 정리', fn: () => prepRematchSheet() },
   pairing:     { name: '페어링 생성', fn: () => runPairing(config.mode) },
-  aim:         { name: '매칭 제안 (AIM)', fn: () => runAim('both') },
-  'aim:new':   { name: '신규 매칭 제안', fn: () => runAim('new') },
-  'aim:rematch': { name: '재매칭 제안', fn: () => runAim('rematch') },
+  send:         { name: '전체 매칭 제안', fn: () => runAim('both') },
+  'send:new':   { name: '신규 매칭 제안', fn: () => runAim('new') },
+  'send:rematch': { name: '재매칭 제안', fn: () => runAim('rematch') },
   statusCheck: { name: '매칭결과 확인', fn: () => runStatusCheck('both') },
   'statusCheck:new': { name: '신규 매칭결과 확인', fn: () => runStatusCheck('new') },
   'statusCheck:rematch': { name: '재매칭 결과 확인', fn: () => runStatusCheck('rematch') },
@@ -64,6 +74,13 @@ const JOBS = {
     if (config.mode === '2' || config.mode === 'both') await createMonthlyTab('rematch');
   }},
 };
+
+function normalizeJobId(jobId) {
+  if (jobId === 'aim') return 'send';
+  if (jobId === 'aim:new') return 'send:new';
+  if (jobId === 'aim:rematch') return 'send:rematch';
+  return jobId;
+}
 
 // 실행 중인 작업 세트 + 대기 큐
 const runningJobs = new Set(); // 실행 중인 jobId들
@@ -76,6 +93,7 @@ function getRunLockId(jobId) {
 }
 
 async function runTask(jobId) {
+  jobId = normalizeJobId(jobId);
   const job = JOBS[jobId];
   if (!job) return { ok: false, message: `알 수 없는 작업: ${jobId}` };
 
@@ -89,34 +107,36 @@ async function runTask(jobId) {
 
   runningJobs.add(lockId);
   running = [...runningJobs].length > 0 ? [...runningJobs].map(id => { const j = JOBS[id]; return j ? j.name : id; }).join(', ') : null;
-  resetAbort();
-  addLog(`=== ${job.name} 시작 ===`);
-  try {
-    await job.fn();
-    if (shouldAbort()) {
-      addLog(`=== ${job.name} 중단됨 ===`);
-      notifier.notify({ title: '매칭 자동화', message: `${job.name} 중단됨` });
-      return { ok: true, message: `${job.name} 중단됨` };
-    }
-    addLog(`=== ${job.name} 완료 ===`);
-    notifier.notify({ title: '매칭 자동화', message: `${job.name} 완료` });
-    return { ok: true, message: `${job.name} 완료` };
-  } catch (err) {
-    if (shouldAbort()) {
-      addLog(`=== ${job.name} 중단됨 ===`);
-      return { ok: true, message: `${job.name} 중단됨` };
-    }
-    addLog(`=== ${job.name} 에러: ${err.message} ===`);
-    notifier.notify({ title: '매칭 자동화', message: `${job.name} 에러: ${err.message}` });
-    return { ok: false, message: err.message };
-  } finally {
-    runningJobs.delete(lockId);
-    running = runningJobs.size > 0 ? [...runningJobs].map(id => { const j = JOBS[id]; return j ? j.name : id; }).join(', ') : null;
-    // 큐에서 같은 버튼 대기 중인 작업 하나 깨우기
-    const idx = taskQueue.findIndex(t => t.lockId === lockId);
-    if (idx >= 0) taskQueue.splice(idx, 1)[0].resolve();
+  return await logContext.run({ jobId, lockId, name: job.name }, async () => {
     resetAbort();
-  }
+    addLog(`=== ${job.name} 시작 ===`);
+    try {
+      await job.fn();
+      if (shouldAbort()) {
+        addLog(`=== ${job.name} 중단됨 ===`);
+        notifier.notify({ title: '매칭 자동화', message: `${job.name} 중단됨` });
+        return { ok: true, message: `${job.name} 중단됨` };
+      }
+      addLog(`=== ${job.name} 완료 ===`);
+      notifier.notify({ title: '매칭 자동화', message: `${job.name} 완료` });
+      return { ok: true, message: `${job.name} 완료` };
+    } catch (err) {
+      if (shouldAbort()) {
+        addLog(`=== ${job.name} 중단됨 ===`);
+        return { ok: true, message: `${job.name} 중단됨` };
+      }
+      addLog(`=== ${job.name} 에러: ${err.message} ===`);
+      notifier.notify({ title: '매칭 자동화', message: `${job.name} 에러: ${err.message}` });
+      return { ok: false, message: err.message };
+    } finally {
+      runningJobs.delete(lockId);
+      running = runningJobs.size > 0 ? [...runningJobs].map(id => { const j = JOBS[id]; return j ? j.name : id; }).join(', ') : null;
+      // 큐에서 같은 버튼 대기 중인 작업 하나 깨우기
+      const idx = taskQueue.findIndex(t => t.lockId === lockId);
+      if (idx >= 0) taskQueue.splice(idx, 1)[0].resolve();
+      resetAbort();
+    }
+  });
 }
 
 // --- 스케줄 관리 (파일 영속화) ---
@@ -171,6 +191,7 @@ function loadSchedulesFromFile() {
 }
 
 function addSchedule(jobId, type, options, forceId, forceEnabled, isRestore) {
+  jobId = normalizeJobId(jobId);
   const id = forceId || scheduleIdCounter++;
   if (!forceId && id >= scheduleIdCounter) scheduleIdCounter = id + 1;
   const job = JOBS[jobId];
