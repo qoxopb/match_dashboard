@@ -66,31 +66,28 @@ const JOBS = {
 };
 
 // 실행 중인 작업 세트 + 대기 큐
-const runningJobs = new Set(); // 실행 중인 baseJobId들
+const runningJobs = new Set(); // 실행 중인 jobId들
 const taskQueue = []; // { jobId, resolve }
 
-function getBaseJobId(jobId) {
-  // 'wf:xxx' → 워크플로 내부 블록의 실제 jobId 기준이 아닌, 최상위 jobId 그룹
-  // 'aim:new', 'aim:rematch', 'aim' → 'aim'
-  // 'statusCheck:new' → 'statusCheck'
-  // 'wf:123' → 'wf:123' (워크플로 자체는 고유)
+function getRunLockId(jobId) {
+  // 같은 버튼을 다시 누른 경우만 큐에 넣고, 다른 버튼은 동시에 실행되도록 개별 jobId 기준으로 잠근다.
   if (jobId.startsWith('wf:')) return 'wf';
-  return jobId.split(':')[0];
+  return jobId;
 }
 
 async function runTask(jobId) {
   const job = JOBS[jobId];
   if (!job) return { ok: false, message: `알 수 없는 작업: ${jobId}` };
 
-  const baseId = getBaseJobId(jobId);
+  const lockId = getRunLockId(jobId);
 
-  // 같은 종류 실행 중이면 큐에 넣고 대기
-  if (runningJobs.has(baseId)) {
-    addLog(`[큐] ${job.name} 대기 (${baseId} 실행 중)`);
-    await new Promise(resolve => { taskQueue.push({ baseId, resolve }); });
+  // 같은 버튼이 이미 실행 중이면 큐에 넣고 대기
+  if (runningJobs.has(lockId)) {
+    addLog(`[큐] ${job.name} 대기 (${lockId} 실행 중)`);
+    await new Promise(resolve => { taskQueue.push({ lockId, resolve }); });
   }
 
-  runningJobs.add(baseId);
+  runningJobs.add(lockId);
   running = [...runningJobs].length > 0 ? [...runningJobs].map(id => { const j = JOBS[id]; return j ? j.name : id; }).join(', ') : null;
   resetAbort();
   addLog(`=== ${job.name} 시작 ===`);
@@ -113,10 +110,10 @@ async function runTask(jobId) {
     notifier.notify({ title: '매칭 자동화', message: `${job.name} 에러: ${err.message}` });
     return { ok: false, message: err.message };
   } finally {
-    runningJobs.delete(baseId);
+    runningJobs.delete(lockId);
     running = runningJobs.size > 0 ? [...runningJobs].map(id => { const j = JOBS[id]; return j ? j.name : id; }).join(', ') : null;
-    // 큐에서 같은 종류 대기 중인 작업 하나 깨우기
-    const idx = taskQueue.findIndex(t => t.baseId === baseId);
+    // 큐에서 같은 버튼 대기 중인 작업 하나 깨우기
+    const idx = taskQueue.findIndex(t => t.lockId === lockId);
     if (idx >= 0) taskQueue.splice(idx, 1)[0].resolve();
     resetAbort();
   }
@@ -298,7 +295,7 @@ app.get('/api/schedules', (req, res) => {
 
 // 로그 + 상태
 app.get('/api/logs', (req, res) => {
-  res.json({ running, logs: logs.map(l => `[${l.time}] ${l.msg}`) });
+  res.json({ running, runningJobs: [...runningJobs], queue: taskQueue.length, logs: logs.map(l => `[${l.time}] ${l.msg}`) });
 });
 
 // 파일 로그 조회 (날짜별, ?date=260422 또는 기본 오늘)

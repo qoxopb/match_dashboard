@@ -363,9 +363,9 @@
     <div class="run-section">
       <label>즉시 실행</label>
       <div style="display:flex;gap:6px;">
-        <button class="btn-run" onclick="runNow('prep:new')">신규매칭</button>
-        <button class="btn-run" onclick="runNow('prep:rematch')">재매칭</button>
-        <button class="btn-run" onclick="runNow('prep')">전체</button>
+        <button class="btn-run" data-run-job="prep:new" onclick="runNow('prep:new')">신규매칭</button>
+        <button class="btn-run" data-run-job="prep:rematch" onclick="runNow('prep:rematch')">재매칭</button>
+        <button class="btn-run" data-run-job="prep" onclick="runNow('prep')">전체</button>
       </div>
     </div>
     <div class="sched-toggle-header" onclick="toggleSched('prep')">
@@ -385,7 +385,7 @@
     </div>
     <div class="run-section">
       <label>즉시 실행</label>
-      <button class="btn-run" onclick="runNow('pairing')">페어링 생성</button>
+      <button class="btn-run" data-run-job="pairing" onclick="runNow('pairing')">페어링 생성</button>
     </div>
     <div class="sched-toggle-header" onclick="toggleSched('pairing')">
       <span class="arrow" id="sched-arrow-pairing">&#9654;</span>
@@ -428,9 +428,9 @@
     <div class="run-section">
       <label>즉시 실행</label>
       <div style="display:flex;gap:6px;">
-        <button class="btn-run" onclick="runNow('aim:new')">신규매칭</button>
-        <button class="btn-run" onclick="runNow('aim:rematch')">재매칭</button>
-        <button class="btn-run" onclick="runNow('aim')">전체</button>
+        <button class="btn-run" data-run-job="aim:new" onclick="runNow('aim:new')">신규매칭</button>
+        <button class="btn-run" data-run-job="aim:rematch" onclick="runNow('aim:rematch')">재매칭</button>
+        <button class="btn-run" data-run-job="aim" onclick="runNow('aim')">전체</button>
       </div>
     </div>
     <div class="sched-toggle-header" onclick="toggleSched('aim')">
@@ -451,9 +451,9 @@
     <div class="run-section">
       <label>즉시 실행</label>
       <div style="display:flex;gap:6px;">
-        <button class="btn-run" onclick="runNow('statusCheck:new')">신규매칭</button>
-        <button class="btn-run" onclick="runNow('statusCheck:rematch')">재매칭</button>
-        <button class="btn-run" onclick="runNow('statusCheck')">전체</button>
+        <button class="btn-run" data-run-job="statusCheck:new" onclick="runNow('statusCheck:new')">신규매칭</button>
+        <button class="btn-run" data-run-job="statusCheck:rematch" onclick="runNow('statusCheck:rematch')">재매칭</button>
+        <button class="btn-run" data-run-job="statusCheck" onclick="runNow('statusCheck')">전체</button>
       </div>
     </div>
     <div class="sched-toggle-header" onclick="toggleSched('statusCheck')">
@@ -470,7 +470,7 @@
     <div class="card-header">
       <span class="card-title">월별 탭 관리</span>
     </div>
-    <button class="btn-monthly" onclick="if(confirm('새 월별 탭을 생성하고 전월 잔여건을 이월합니다. 진행할까요?')) runNow('monthly')">월별 탭 생성 (월초 1회)</button>
+    <button class="btn-monthly" data-run-job="monthly" onclick="if(confirm('새 월별 탭을 생성하고 전월 잔여건을 이월합니다. 진행할까요?')) runNow('monthly')">월별 탭 생성 (월초 1회)</button>
   </div>
 
         <!-- 로그 -->
@@ -717,7 +717,7 @@
 
     // --- API 호출 ---
     async function runNow(jobId) {
-      setRunning(jobId);
+      setRunning(jobId, [...new Set([...activeRunJobs, runLockId(jobId)])]);
       try {
         const res = await fetch(`/api/run/${jobId}`, { method: 'POST' });
         const data = await res.json();
@@ -725,7 +725,6 @@
       } catch (e) {
         appendLog('[ERROR] ' + e.message, 'error');
       }
-      setIdle();
       fetchLogs();
     }
 
@@ -815,15 +814,30 @@
 
     // --- 상태 & 로그 ---
     const logBox = document.getElementById('log-box');
+    let activeRunJobs = [];
 
-    function setRunning(name) {
+    function runLockId(jobId) {
+      if (!jobId) return '';
+      if (jobId.startsWith('wf:')) return 'wf';
+      return jobId;
+    }
+
+    function updateRunButtons(runningJobs = []) {
+      const runningLocks = new Set(runningJobs.map(runLockId));
+      document.querySelectorAll('#view-features [data-run-job]').forEach(button => {
+        button.disabled = runningLocks.has(runLockId(button.dataset.runJob));
+      });
+    }
+
+    function setRunning(name, runningJobs = activeRunJobs) {
+      activeRunJobs = runningJobs;
       const bar = document.getElementById('status-bar');
       bar.className = 'status-bar status-running';
       bar.innerHTML = `<div class="spinner"></div><span>${name} 실행 중...</span><button class="btn-abort" onclick="stopTask()">중단하기</button>`;
       const wfBar = document.getElementById('wf-status-bar');
       wfBar.className = 'status-bar status-running';
       wfBar.innerHTML = `<div class="spinner"></div><span>${name} 실행 중...</span><button class="btn-abort" onclick="stopTask()">중단하기</button>`;
-      document.querySelectorAll('#view-features button:not(.btn-abort)').forEach(b => b.disabled = true);
+      updateRunButtons(runningJobs);
     }
 
     async function stopTask() {
@@ -835,13 +849,14 @@
     }
 
     function setIdle() {
+      activeRunJobs = [];
       const bar = document.getElementById('status-bar');
       bar.className = 'status-bar status-idle';
       bar.innerHTML = '<span>대기 중</span>';
       const wfBar = document.getElementById('wf-status-bar');
       wfBar.className = 'status-bar status-idle';
       wfBar.innerHTML = '<span>대기 중</span>';
-      document.querySelectorAll('#view-features button').forEach(b => b.disabled = false);
+      updateRunButtons([]);
     }
 
     function appendLog(text, cls) {
@@ -862,7 +877,7 @@
             : (log.includes('완료') || log.includes('성공')) ? 'success' : '';
           appendLog(log, cls);
         });
-        if (data.running) setRunning(data.running); else setIdle();
+        if (data.running) setRunning(data.running, data.runningJobs || []); else setIdle();
       } catch (e) {}
     }
 
