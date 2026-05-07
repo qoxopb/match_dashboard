@@ -358,7 +358,6 @@
   <div class="card" id="card-prep">
     <div class="card-header">
       <span class="card-title">시트 정리</span>
-      <span class="badge badge-off" id="badge-prep">스케줄 없음</span>
     </div>
     <div class="run-section">
       <label>즉시 실행</label>
@@ -368,31 +367,16 @@
         <button class="btn-run" data-run-job="prep" onclick="runNow('prep')">전체</button>
       </div>
     </div>
-    <div class="sched-toggle-header" onclick="toggleSched('prep')">
-      <span class="arrow" id="sched-arrow-prep">&#9654;</span>
-      <span class="label">스케줄 설정</span>
-    </div>
-    <div class="sched-body collapsed" id="sched-body-prep">
-      <div class="schedule-section" data-job="prep"></div>
-    </div>
   </div>
 
   <!-- 페어링 생성 -->
   <div class="card" id="card-pairing">
     <div class="card-header">
       <span class="card-title">페어링 생성</span>
-      <span class="badge badge-off" id="badge-pairing">스케줄 없음</span>
     </div>
     <div class="run-section">
       <label>즉시 실행</label>
       <button class="btn-run" data-run-job="pairing" onclick="runNow('pairing')">페어링 생성</button>
-    </div>
-    <div class="sched-toggle-header" onclick="toggleSched('pairing')">
-      <span class="arrow" id="sched-arrow-pairing">&#9654;</span>
-      <span class="label">스케줄 설정</span>
-    </div>
-    <div class="sched-body collapsed" id="sched-body-pairing">
-      <div class="schedule-section" data-job="pairing"></div>
     </div>
   </div>
 
@@ -422,7 +406,6 @@
   <div class="card" id="card-send">
     <div class="card-header">
       <span class="card-title">매칭 제안</span>
-      <span class="badge badge-off" id="badge-send">스케줄 없음</span>
       <button class="btn-run" style="margin-left:auto;font-size:12px;padding:3px 10px;" onclick="openAimKeywords()">설정</button>
     </div>
     <div class="run-section">
@@ -433,20 +416,12 @@
         <button class="btn-run" data-run-job="send" onclick="runNow('send')">전체</button>
       </div>
     </div>
-    <div class="sched-toggle-header" onclick="toggleSched('send')">
-      <span class="arrow" id="sched-arrow-send">&#9654;</span>
-      <span class="label">스케줄 설정</span>
-    </div>
-    <div class="sched-body collapsed" id="sched-body-send">
-      <div class="schedule-section" data-job="send"></div>
-    </div>
   </div>
 
   <!-- 매칭결과 확인 -->
   <div class="card" id="card-statusCheck">
     <div class="card-header">
       <span class="card-title">매칭결과 확인</span>
-      <span class="badge badge-off" id="badge-statusCheck">스케줄 없음</span>
     </div>
     <div class="run-section">
       <label>즉시 실행</label>
@@ -455,13 +430,6 @@
         <button class="btn-run" data-run-job="statusCheck:rematch" onclick="runNow('statusCheck:rematch')">재매칭</button>
         <button class="btn-run" data-run-job="statusCheck" onclick="runNow('statusCheck')">전체</button>
       </div>
-    </div>
-    <div class="sched-toggle-header" onclick="toggleSched('statusCheck')">
-      <span class="arrow" id="sched-arrow-statusCheck">&#9654;</span>
-      <span class="label">스케줄 설정</span>
-    </div>
-    <div class="sched-body collapsed" id="sched-body-statusCheck">
-      <div class="schedule-section" data-job="statusCheck"></div>
     </div>
   </div>
 
