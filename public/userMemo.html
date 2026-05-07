@@ -290,6 +290,12 @@
       badge.className = 'type-badge ' + (type === 'new' ? 'type-new' : 'type-rematch');
 
       try {
+        const statusRes = await fetch('/api/status');
+        const statusData = await statusRes.json();
+        window.ADMIN_URL = statusData.adminUrl || '';
+      } catch {}
+
+      try {
         // 1단계: 어드민 상태 동기화 (statusCheck)
         document.querySelector('#loading-screen span').textContent = '매칭결과 확인 중...';
         await fetch(`/api/userMemo/sync?type=${type}`);
@@ -475,13 +481,13 @@
 
       // 정보 라인
       const parts = [];
-      if (uid) parts.push(`<a href="https://tutor-admin.qanda.ai/admin/users/${uid}" target="_blank" style="color:#1976d2">${uid}</a>`);
+      if (uid) parts.push(`<a href="${window.ADMIN_URL}/admin/users/${uid}" target="_blank" style="color:#1976d2">${uid}</a>`);
       if (uname) parts.push(uname);
       const gradeCategory = (pp.gradeCategory || app.gradeCategory || '');
       if (gradeCategory) parts.push(gradeCategory);
-      parts.push(`matchid <a href="https://tutor-admin.qanda.ai/admin/tutor-pairing?page=1&size=20&filters_matchId=${mid}" target="_blank" style="color:#1976d2">${mid}</a>`);
+      parts.push(`matchid <a href="${window.ADMIN_URL}/admin/tutor-pairing?page=1&size=20&filters_matchId=${mid}" target="_blank" style="color:#1976d2">${mid}</a>`);
       const oid = app.orderId || '';
-      if (oid) parts.push(`orderid <a href="https://tutor-admin.qanda.ai/admin/lessons/orders/${oid}" target="_blank" style="color:#1976d2">${oid}</a>`);
+      if (oid) parts.push(`orderid <a href="${window.ADMIN_URL}/admin/lessons/orders/${oid}" target="_blank" style="color:#1976d2">${oid}</a>`);
       const subjectDetail = app.subjectDetail || '';
       if (subjectDetail) parts.push(subjectDetail);
       if (lessonInfo) parts.push(lessonInfo);

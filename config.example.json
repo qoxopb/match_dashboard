@@ -1,4 +1,5 @@
 {
+  "adminUrl": "https://YOUR_ADMIN_DOMAIN",
   "mode": "both",
   "jobs": {
     "pairing": { "enabled": true, "schedule": "0 9 * * 1-5" },
@@ -10,7 +11,8 @@
   "slack": {
     "userToken": "xoxp-...",
     "botToken": "xoxb-...",
-    "channelId": "YOUR_CHANNEL_ID"
+    "channelId": "YOUR_CHANNEL_ID",
+    "workspaceUrl": "https://YOUR_WORKSPACE.slack.com"
   },
   "aimKeywords": [],
   "sheets": {

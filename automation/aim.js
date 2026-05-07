@@ -3,7 +3,7 @@ const { getSheetsApi } = require('../sheets');
 const config = require('../config.json');
 const { shouldAbort, setActivePage } = require('../abort');
 
-const ADMIN_URL = 'https://tutor-admin.qanda.ai/admin/tutor-pairing';
+const ADMIN_URL = config.adminUrl + '/admin/tutor-pairing';
 
 function getMonthlyTabName(type) {
   const now = new Date();
@@ -267,7 +267,7 @@ async function processOne(page, target, sheets, spreadsheetId, monthlyTab, statu
   });
   if (!detailHref) { console.log(`${tag} 상세 링크 못 찾음`); return 'error'; }
 
-  await page.goto(new URL(detailHref, 'https://tutor-admin.qanda.ai').href, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await page.goto(new URL(detailHref, config.adminUrl).href, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
   // __NEXT_DATA__에서 학생 시간표 + product 정보 한 번에 읽기
   try { await page.waitForSelector('#__NEXT_DATA__', { state: 'attached', timeout: 5000 }); } catch {}
@@ -294,7 +294,7 @@ async function processOne(page, target, sheets, spreadsheetId, monthlyTab, statu
     const fixResult = await fixPairingStatus(page, tag);
     if (fixResult) {
       // 상세 페이지로 다시 이동
-      const detailUrl = new URL(detailHref, 'https://tutor-admin.qanda.ai').href;
+      const detailUrl = new URL(detailHref, config.adminUrl).href;
       await page.goto(detailUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
       await page.waitForTimeout(2000);
     } else {
@@ -398,7 +398,7 @@ async function processOne(page, target, sheets, spreadsheetId, monthlyTab, statu
         const fixResult = await fixAdminSchedule(page, studentSchedule, hoursNeeded, tag);
         if (fixResult.ok) {
           Object.assign(studentSchedule, fixResult.expandedSchedule);
-          const detailUrl = new URL(detailHref, 'https://tutor-admin.qanda.ai').href;
+          const detailUrl = new URL(detailHref, config.adminUrl).href;
           await page.goto(detailUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
           await page.waitForTimeout(2000);
         }
@@ -425,7 +425,7 @@ async function processOne(page, target, sheets, spreadsheetId, monthlyTab, statu
 
     // 1�� 실패 → 원래 조건으로 리셋 (페이지 재이동)
     console.log(`${tag} ${uniLabel} 변형 매칭 실패 → 원래 조건으로 리셋`);
-    const detailUrl = new URL(detailHref, 'https://tutor-admin.qanda.ai').href;
+    const detailUrl = new URL(detailHref, config.adminUrl).href;
     await page.goto(detailUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForTimeout(2000);
 
@@ -442,7 +442,7 @@ async function processOne(page, target, sheets, spreadsheetId, monthlyTab, statu
     // PRO 마지막 시도: 교대/메디컬 해제 + SKY/서성한/중경외시
     if (isExpert) {
       console.log(`${tag} PRO → 교대/메디컬 해제 + SKY/서성한/중경외시 매칭 시도`);
-      const detailUrl2 = new URL(detailHref, 'https://tutor-admin.qanda.ai').href;
+      const detailUrl2 = new URL(detailHref, config.adminUrl).href;
       await page.goto(detailUrl2, { waitUntil: 'domcontentloaded', timeout: 30000 });
       await page.waitForTimeout(2000);
       await applyUniMajorFilter(page, tag, { uncheckUni: '교대', addUni: ['SKY', '서성한', '중경외시'], addMajor: [] });
@@ -531,7 +531,7 @@ async function processOne(page, target, sheets, spreadsheetId, monthlyTab, statu
         Object.assign(studentSchedule, fixResult.expandedSchedule);
         console.log(`${tag} 어드민 시간표 수정 완료 → 상세 페이지 재이동`);
         // Submit 후 페이지가 목록으로 돌아갈 수 있으므로 상세 페이지로 다시 이동
-        const detailUrl = new URL(detailHref, 'https://tutor-admin.qanda.ai').href;
+        const detailUrl = new URL(detailHref, config.adminUrl).href;
         await page.goto(detailUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
         await page.waitForTimeout(2000);
         // validateStudentSchedule 통과 후 아래 수동매칭으로 fall through
@@ -596,7 +596,7 @@ async function processOne(page, target, sheets, spreadsheetId, monthlyTab, statu
   // PRO 마지막 시도: 교대/메디컬 해제 + SKY/서성한/중경외시
   if (isExpert) {
     console.log(`${tag} PRO → 교대/메디컬 해제 + SKY/서성한/중경외시 매칭 시도`);
-    const detailUrl = new URL(detailHref, 'https://tutor-admin.qanda.ai').href;
+    const detailUrl = new URL(detailHref, config.adminUrl).href;
     await page.goto(detailUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForTimeout(2000);
     await applyUniMajorFilter(page, tag, { uncheckUni: '교대', addUni: ['SKY', '서성한', '중경외시'], addMajor: [] });
@@ -1611,7 +1611,7 @@ async function fixPairingStatus(page, tag) {
       return false;
     }
     const pairingId = pairingIdMatch[1];
-    const updateUrl = `https://tutor-admin.qanda.ai/admin/tutor-pairing/${pairingId}/update`;
+    const updateUrl = `${config.adminUrl}/admin/tutor-pairing/${pairingId}/update`;
     console.log(`${tag} Tutor Pairing Update 이동: ${updateUrl}`);
 
     await page.goto(updateUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
