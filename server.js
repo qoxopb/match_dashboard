@@ -693,15 +693,48 @@ app.post('/api/config/set', (req, res) => {
 
 // 담당자 목록 API
 const DEFAULT_MANAGERS = ['jina', 'harry', 'hannah', 'amanda', 'kasey', 'iris'];
+
+async function applyManagerValidation(managers) {
+  const sheets = await getSheetsApi();
+  const validationRule = managers.length > 0 ? {
+    condition: { type: 'ONE_OF_LIST', values: managers.map(v => ({ userEnteredValue: v })) },
+    showCustomUi: true,
+    strict: false,
+  } : null;
+
+  async function applyToSpreadsheet(spreadsheetId, colIdx) {
+    const meta = await sheets.spreadsheets.get({ spreadsheetId, fields: 'sheets(properties(sheetId))' });
+    const requests = (meta.data.sheets || []).map(s => ({
+      setDataValidation: {
+        range: { sheetId: s.properties.sheetId, startRowIndex: 1, startColumnIndex: colIdx, endColumnIndex: colIdx + 1 },
+        rule: validationRule,
+      },
+    }));
+    if (requests.length) await sheets.spreadsheets.batchUpdate({ spreadsheetId, requestBody: { requests } });
+  }
+
+  const results = [];
+  if (config.sheets && config.sheets.new) {
+    try { await applyToSpreadsheet(config.sheets.new, 41); results.push('신규 AP열 적용'); }
+    catch (e) { results.push(`신규 시트 실패: ${e.message}`); }
+  }
+  if (config.sheets && config.sheets.rematch) {
+    try { await applyToSpreadsheet(config.sheets.rematch, 17); results.push('재매칭 R열 적용'); }
+    catch (e) { results.push(`재매칭 시트 실패: ${e.message}`); }
+  }
+  return results;
+}
+
 app.get('/api/config/managers', (req, res) => {
   res.json(config.managerList || DEFAULT_MANAGERS);
 });
-app.post('/api/config/managers', (req, res) => {
+app.post('/api/config/managers', async (req, res) => {
   const { managers } = req.body;
   if (!Array.isArray(managers)) return res.status(400).json({ error: 'managers 배열 필요' });
   config.managerList = managers;
   saveConfig();
-  res.json({ ok: true, managers });
+  const sheetResults = await applyManagerValidation(managers).catch(e => [`시트 적용 오류: ${e.message}`]);
+  res.json({ ok: true, managers, sheetResults });
 });
 
 // 슬랙 태그 대상 API — [{id, name}]

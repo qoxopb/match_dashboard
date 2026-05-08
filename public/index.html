@@ -638,6 +638,7 @@
                 onkeydown="if(event.key==='Enter')addManagerItem()" />
               <button class="btn-run" onclick="addManagerItem()">추가</button>
             </div>
+            <div id="manager-save-status" style="font-size:12px;margin-top:8px;min-height:16px;"></div>
           </div>
         </div>
 
@@ -792,12 +793,19 @@
     }
 
     async function saveManagerList(managers) {
-      await fetch('/api/config/managers', {
+      const res = await fetch('/api/config/managers', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ managers }),
       });
+      const data = await res.json();
       buildManagerOptions(managers);
       renderManagerItems(managers);
+      const statusEl = document.getElementById('manager-save-status');
+      if (statusEl && data.sheetResults) {
+        statusEl.textContent = data.sheetResults.join(', ');
+        statusEl.style.color = data.sheetResults.some(r => r.includes('실패') || r.includes('오류')) ? '#e53935' : '#2e7d32';
+        setTimeout(() => { statusEl.textContent = ''; }, 4000);
+      }
     }
 
     function initManagerSelect() { /* 목록 로드 후 buildManagerOptions에서 처리 */ }
