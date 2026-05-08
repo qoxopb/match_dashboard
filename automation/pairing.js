@@ -2,7 +2,7 @@ const { newBackgroundPage } = require('./browser');
 const { getSheetsApi } = require('../sheets');
 const config = require('../config.json');
 
-const ADMIN_URL = config.adminUrl + '/admin/tutor-pairing';
+const ADMIN_URL = (config.adminUrl || 'https://tutor-admin.qanda.ai') + '/admin/tutor-pairing';
 const WORKER_COUNT = 5;
 
 function getMonthlyTabName() {

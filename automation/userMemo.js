@@ -2,7 +2,8 @@ const { newBackgroundPage } = require('./browser');
 const axios = require('axios');
 const config = require('../config.json');
 
-const ADMIN_URL = config.adminUrl + '/admin/tutor-pairing';
+const ADMIN_BASE = ADMIN_BASE || 'https://tutor-admin.qanda.ai';
+const ADMIN_URL = ADMIN_BASE + '/admin/tutor-pairing';
 
 let slackChannelName = null;
 
@@ -44,7 +45,7 @@ async function scrapeAdmin(matchId) {
     }
 
     await page.goto(
-      new URL(detailHref, config.adminUrl).href,
+      new URL(detailHref, ADMIN_BASE).href,
       { waitUntil: 'domcontentloaded', timeout: 30000 }
     );
 
@@ -182,7 +183,7 @@ async function saveTutorMemo(matchId, tutorMemo) {
 
     // 2) 상세 페이지 이동
     await page.goto(
-      new URL(detailHref, config.adminUrl).href,
+      new URL(detailHref, ADMIN_BASE).href,
       { waitUntil: 'domcontentloaded', timeout: 30000 }
     );
 
@@ -309,7 +310,7 @@ async function fetchSlackRequests(matchId, createdAt) {
 
   return matches.map(m => ({
     text: m.text,
-    permalink: `${config.slack.workspaceUrl}/archives/${channelId}/p${m.ts.replace('.', '')}`,
+    permalink: `${config.slack.workspaceUrl || 'https://slack.com'}/archives/${channelId}/p${m.ts.replace('.', '')}`,
     date: new Date(parseFloat(m.ts) * 1000).toLocaleString('ko-KR'),
   }));
 }

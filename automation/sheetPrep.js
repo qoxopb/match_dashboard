@@ -25,7 +25,7 @@ async function refreshViaGas(spreadsheetId) {
   }
 }
 
-const REMATCH_ADMIN_URL = config.adminUrl + '/admin/tutor-pairing?page=1&size=100&filters_rematch=true&filters_tutorPairingStatusList=READY%2CMATCHING%2CAIM_ING%2CUNPAIRED&sort=lastLessonDate%2CASC';
+const REMATCH_ADMIN_URL = (config.adminUrl || 'https://tutor-admin.qanda.ai') + '/admin/tutor-pairing?page=1&size=100&filters_rematch=true&filters_tutorPairingStatusList=READY%2CMATCHING%2CAIM_ING%2CUNPAIRED&sort=lastLessonDate%2CASC';
 
 // 현재 월 탭 이름 생성: [신규] 25.04, [재매칭] 25.04
 function getMonthlyTabName(type) {

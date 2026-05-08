@@ -5,6 +5,7 @@ const fs = require('fs');
 const { AsyncLocalStorage } = require('async_hooks');
 const notifier = require('node-notifier');
 const config = require('./config.json');
+const ADMIN_BASE = ADMIN_BASE || 'https://tutor-admin.qanda.ai';
 const { prepNewSheet, prepRematchSheet, createMonthlyTab } = require('./automation/sheetPrep');
 const { runPairing } = require('./automation/pairing');
 const { runStatusCheck, runStatusCheckForType } = require('./automation/statusCheck');
@@ -345,7 +346,7 @@ app.get('/api/logs/files', (req, res) => {
 });
 
 app.get('/api/status', (req, res) => {
-  res.json({ running, runningJobs: [...runningJobs], queue: taskQueue.length, mode: config.mode, adminUrl: config.adminUrl });
+  res.json({ running, runningJobs: [...runningJobs], queue: taskQueue.length, mode: config.mode, adminUrl: ADMIN_BASE });
 });
 
 // [디버그] 유저메모 시트의 status 분포 + 필터 결과
@@ -444,14 +445,14 @@ app.get('/api/debug/nextdata/:matchId', async (req, res) => {
   const page = await newBackgroundPage();
   try {
     const matchId = req.params.matchId;
-    await page.goto(`${config.adminUrl}/admin/tutor-pairing?page=1&size=20&filters_matchId=${matchId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.goto(`${ADMIN_BASE}/admin/tutor-pairing?page=1&size=20&filters_matchId=${matchId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForSelector('table tbody', { timeout: 8000 });
     const detailHref = await page.evaluate(() => {
       const link = document.querySelector('table tbody a[href*="/tutor-pairing/"]');
       return link ? link.getAttribute('href') : null;
     });
     if (!detailHref) return res.json({ error: '상세 링크 못 찾음' });
-    await page.goto(new URL(detailHref, config.adminUrl).href, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.goto(new URL(detailHref, ADMIN_BASE).href, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForSelector('#__NEXT_DATA__', { state: 'attached', timeout: 5000 });
 
     const data = await page.evaluate(() => {
@@ -491,14 +492,14 @@ app.get('/api/debug/pairing/:matchId', async (req, res) => {
   const page = await newBackgroundPage();
   try {
     const matchId = req.params.matchId;
-    await page.goto(`${config.adminUrl}/admin/tutor-pairing?page=1&size=20&filters_matchId=${matchId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.goto(`${ADMIN_BASE}/admin/tutor-pairing?page=1&size=20&filters_matchId=${matchId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForSelector('table tbody', { timeout: 8000 });
     const detailHref = await page.evaluate(() => {
       const link = document.querySelector('table tbody a[href*="/tutor-pairing/"]');
       return link ? link.getAttribute('href') : null;
     });
     if (!detailHref) return res.json({ error: '상세 링크 못 찾음' });
-    await page.goto(new URL(detailHref, config.adminUrl).href, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.goto(new URL(detailHref, ADMIN_BASE).href, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForTimeout(3000);
 
     // 완화 단계 (쿼리: ?relax=0,1,2,3)
