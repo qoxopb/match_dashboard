@@ -55,6 +55,25 @@
     .spinner { width: 14px; height: 14px; border: 2px solid #e65100; border-top-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    /* 섹션 헤더 */
+    .section-header {
+      display: flex; align-items: center; gap: 10px;
+      margin: 20px 0 10px; padding: 6px 2px;
+    }
+    .section-header:first-child { margin-top: 0; }
+    .section-title {
+      font-size: 13px; font-weight: 700; color: #555; text-transform: uppercase;
+      letter-spacing: 0.5px; white-space: nowrap;
+    }
+    .section-line {
+      flex: 1; height: 1px; background: #e0e0e0;
+    }
+    .manager-select {
+      padding: 4px 8px; border: 1px solid #d0d0d0; border-radius: 6px;
+      font-size: 13px; background: #fff; color: #333; cursor: pointer;
+      font-family: inherit;
+    }
+
     /* 카드 */
     .card {
       background: #fff; border-radius: 12px; padding: 20px;
@@ -354,6 +373,12 @@
           <span id="status-text">대기 중</span>
         </div>
 
+  <!-- 공통작업 섹션 -->
+  <div class="section-header">
+    <span class="section-title">공통작업</span>
+    <div class="section-line"></div>
+  </div>
+
   <!-- 시트 정리 -->
   <div class="card" id="card-prep">
     <div class="card-header">
@@ -378,6 +403,20 @@
       <label>즉시 실행</label>
       <button class="btn-run" data-run-job="pairing" onclick="runNow('pairing')">페어링 생성</button>
     </div>
+  </div>
+
+  <!-- 담당자 섹션 -->
+  <div class="section-header">
+    <span class="section-title">담당자</span>
+    <select class="manager-select" id="manager-select" onchange="saveManager(this.value)">
+      <option value="공통">공통</option>
+      <option value="jina">jina</option>
+      <option value="harry">harry</option>
+      <option value="hannah">hannah</option>
+      <option value="amanda">amanda</option>
+      <option value="kasey">kasey</option>
+    </select>
+    <div class="section-line"></div>
   </div>
 
   <!-- 유저메모 편집 -->
@@ -683,11 +722,28 @@
       el.classList.toggle('selected');
     }
 
+    // --- 담당자 (기기별 localStorage) ---
+    const MANAGER_JOBS = new Set(['send', 'send:new', 'send:rematch', 'statusCheck', 'statusCheck:new', 'statusCheck:rematch']);
+    function getManager() { return localStorage.getItem('matchDashboard_manager') || '공통'; }
+    function saveManager(val) {
+      localStorage.setItem('matchDashboard_manager', val);
+    }
+    function initManagerSelect() {
+      const sel = document.getElementById('manager-select');
+      if (sel) sel.value = getManager();
+    }
+
     // --- API 호출 ---
     async function runNow(jobId) {
       setRunning(jobId, [...new Set([...activeRunJobs, runLockId(jobId)])]);
       try {
-        const res = await fetch(`/api/run/${jobId}`, { method: 'POST' });
+        const body = {};
+        if (MANAGER_JOBS.has(jobId)) body.manager = getManager();
+        const res = await fetch(`/api/run/${jobId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
         const data = await res.json();
         if (!data.ok) appendLog('[ERROR] ' + data.message, 'error');
       } catch (e) {
@@ -1779,11 +1835,15 @@
     }
     function openMemo(type) {
       const filterParam = memoFilter === 'initial' ? '&filter=initial' : '';
-      window.open(`/userMemo.html?type=${type}${filterParam}`, '_blank');
+      const manager = getManager();
+      const managerParam = manager && manager !== '공통' ? `&manager=${encodeURIComponent(manager)}` : '';
+      window.open(`/userMemo.html?type=${type}${filterParam}${managerParam}`, '_blank');
     }
     function openMemoAll() {
       const filterParam = memoFilter === 'initial' ? '&filter=initial' : '';
-      window.open(`/userMemo.html?type=new${filterParam}&autoNext=true`, '_blank');
+      const manager = getManager();
+      const managerParam = manager && manager !== '공통' ? `&manager=${encodeURIComponent(manager)}` : '';
+      window.open(`/userMemo.html?type=new${filterParam}&autoNext=true${managerParam}`, '_blank');
     }
 
     // --- 버전 체크 & 업데이트 ---
@@ -1887,6 +1947,7 @@
 
     // 초기화
     initScheduleSections();
+    initManagerSelect();
     fetchSchedules();
     fetchLogs();
     setInterval(() => { fetchLogs(); fetchSchedules(); }, 3000);

@@ -92,9 +92,10 @@ function matchSchedules(studentSchedule, tutorSchedule, weekly, hoursNeeded) {
 }
 
 // --- 메인 ---
-async function runAimForType(type) {
+async function runAimForType(type, manager) {
   const label = type === 'new' ? '신규' : '재매칭';
-  console.log(`\n[send] === ${label} 매칭 제안 시작 ===`);
+  const managerLabel = manager && manager !== '공통' ? ` (담당자: ${manager})` : '';
+  console.log(`\n[send] === ${label} 매칭 제안 시작${managerLabel} ===`);
   const startedAt = Date.now();
 
   const sheets = await getSheetsApi();
@@ -131,12 +132,20 @@ async function runAimForType(type) {
   const aimKeywords = config.aimKeywords || [];
   const normNoSpace = s => (s || '').replace(/\s+/g, '').toLowerCase();
 
+  // 담당자 필터 (new: AP열=index 41, rematch: R열=index 17)
+  const managerColIdx = type === 'new' ? 41 : 17;
+  const filterByManager = manager && manager !== '공통';
+
   const targets = [];
   let keywordSkipped = 0;
   rows.forEach((row, i) => {
     const matchId = (row[matchIdIdx] || '').trim();
     const status = (row[statusIdx] || '').trim();
     if (matchId && !excludeList.includes(norm(status))) {
+      if (filterByManager) {
+        const rowManager = (row[managerColIdx] || '').trim().toLowerCase();
+        if (rowManager !== manager.toLowerCase()) return;
+      }
       const formData = {};
       header.forEach((h, ci) => { formData[h] = row[ci] || ''; });
 
@@ -2053,14 +2062,14 @@ async function applyRelaxation(page, level, tag) {
 }
 
 // --- 외부 API ---
-async function runAim(mode) {
+async function runAim(mode, manager) {
   if (mode === '1' || mode === 'new') {
-    await runAimForType('new');
+    await runAimForType('new', manager);
   } else if (mode === '2' || mode === 'rematch') {
-    await runAimForType('rematch');
+    await runAimForType('rematch', manager);
   } else {
-    await runAimForType('new');
-    await runAimForType('rematch');
+    await runAimForType('new', manager);
+    await runAimForType('rematch', manager);
   }
 }
 

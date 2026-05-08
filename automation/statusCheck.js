@@ -75,9 +75,10 @@ async function searchAndGetStatus(page, id, tag = '', useIdFilter = false) {
   return result.status;
 }
 
-async function runStatusCheckForType(type) {
+async function runStatusCheckForType(type, manager) {
   const label = type === 'new' ? '신규' : '재매칭';
-  console.log(`\n[statusCheck] === ${label} 매칭결과 확인 시작 ===`);
+  const managerLabel = manager && manager !== '공통' ? ` (담당자: ${manager})` : '';
+  console.log(`\n[statusCheck] === ${label} 매칭결과 확인 시작${managerLabel} ===`);
   const startedAt = Date.now();
 
   const sheets = await getSheetsApi();
@@ -116,11 +117,19 @@ async function runStatusCheckForType(type) {
   const excludeRematch = ['재매칭 완료', '재매칭완료', '환불/소멸', '환불', '소멸'];
   const excludeList = (type === 'new' ? excludeNew : excludeRematch).map(norm);
 
+  // 담당자 필터 (new: AP열=index 41, rematch: R열=index 17)
+  const managerColIdx = type === 'new' ? 41 : 17;
+  const filterByManager = manager && manager !== '공통';
+
   const targets = [];
   rows.forEach((row, i) => {
     const matchId = (row[matchIdIdx] || '').trim();
     const status = (row[statusIdx] || '').trim();
     if (matchId && !excludeList.includes(norm(status))) {
+      if (filterByManager) {
+        const rowManager = (row[managerColIdx] || '').trim().toLowerCase();
+        if (rowManager !== manager.toLowerCase()) return;
+      }
       const pairingId = pairingIdIdx >= 0 ? (row[pairingIdIdx] || '').trim() : '';
       targets.push({ matchId, rowNum: i + 2, currentStatus: status, pairingId });
     }
@@ -196,14 +205,14 @@ async function runStatusCheckForType(type) {
   console.log(`[statusCheck] === ${label} 완료: 매칭완료 ${counters.updated}, 스킵 ${counters.skipped}, 에러 ${counters.error} | 소요시간 ${elapsedStr} ===`);
 }
 
-async function runStatusCheck(mode) {
+async function runStatusCheck(mode, manager) {
   if (mode === '1' || mode === 'new') {
-    await runStatusCheckForType('new');
+    await runStatusCheckForType('new', manager);
   } else if (mode === '2' || mode === 'rematch') {
-    await runStatusCheckForType('rematch');
+    await runStatusCheckForType('rematch', manager);
   } else {
-    await runStatusCheckForType('new');
-    await runStatusCheckForType('rematch');
+    await runStatusCheckForType('new', manager);
+    await runStatusCheckForType('rematch', manager);
   }
 }
 

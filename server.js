@@ -64,12 +64,12 @@ const JOBS = {
   'prep:new':  { name: '신규 시트 정리', fn: () => prepNewSheet() },
   'prep:rematch': { name: '재매칭 시트 정리', fn: () => prepRematchSheet() },
   pairing:     { name: '페어링 생성', fn: () => runPairing(config.mode) },
-  send:         { name: '전체 매칭 제안', fn: () => runAim('both') },
-  'send:new':   { name: '신규 매칭 제안', fn: () => runAim('new') },
-  'send:rematch': { name: '재매칭 제안', fn: () => runAim('rematch') },
-  statusCheck: { name: '매칭결과 확인', fn: () => runStatusCheck('both') },
-  'statusCheck:new': { name: '신규 매칭결과 확인', fn: () => runStatusCheck('new') },
-  'statusCheck:rematch': { name: '재매칭 결과 확인', fn: () => runStatusCheck('rematch') },
+  send:         { name: '전체 매칭 제안', fn: (opts) => runAim('both', opts && opts.manager) },
+  'send:new':   { name: '신규 매칭 제안', fn: (opts) => runAim('new', opts && opts.manager) },
+  'send:rematch': { name: '재매칭 제안', fn: (opts) => runAim('rematch', opts && opts.manager) },
+  statusCheck: { name: '매칭결과 확인', fn: (opts) => runStatusCheck('both', opts && opts.manager) },
+  'statusCheck:new': { name: '신규 매칭결과 확인', fn: (opts) => runStatusCheck('new', opts && opts.manager) },
+  'statusCheck:rematch': { name: '재매칭 결과 확인', fn: (opts) => runStatusCheck('rematch', opts && opts.manager) },
   monthly:     { name: '월별 탭 생성', fn: async () => {
     if (config.mode === '1' || config.mode === 'both') await createMonthlyTab('new');
     if (config.mode === '2' || config.mode === 'both') await createMonthlyTab('rematch');
@@ -93,7 +93,7 @@ function getRunLockId(jobId) {
   return jobId;
 }
 
-async function runTask(jobId) {
+async function runTask(jobId, opts = {}) {
   jobId = normalizeJobId(jobId);
   const job = JOBS[jobId];
   if (!job) return { ok: false, message: `알 수 없는 작업: ${jobId}` };
@@ -110,9 +110,9 @@ async function runTask(jobId) {
   running = [...runningJobs].length > 0 ? [...runningJobs].map(id => { const j = JOBS[id]; return j ? j.name : id; }).join(', ') : null;
   return await logContext.run({ jobId, lockId, name: job.name }, async () => {
     resetAbort();
-    addLog(`=== ${job.name} 시작 ===`);
+    addLog(`=== ${job.name} 시작${opts.manager && opts.manager !== '공통' ? ` (담당자: ${opts.manager})` : ''} ===`);
     try {
-      await job.fn();
+      await job.fn(opts);
       if (shouldAbort()) {
         addLog(`=== ${job.name} 중단됨 ===`);
         notifier.notify({ title: '매칭 자동화', message: `${job.name} 중단됨` });
@@ -286,7 +286,8 @@ function getScheduleList() {
 
 // 즉시 실행
 app.post('/api/run/:jobId', async (req, res) => {
-  const result = await runTask(req.params.jobId);
+  const opts = req.body || {};
+  const result = await runTask(req.params.jobId, opts);
   res.json(result);
 });
 
@@ -761,6 +762,9 @@ app.get('/api/userMemo/list', async (req, res) => {
     const matchIdIdx = header.findIndex(h => norm(h) === norm(matchIdCol));
     const statusIdx = header.findIndex(h => norm(h) === norm(statusCol));
 
+    const managerFilter = (req.query.manager || '').trim();
+    const managerColIdx = type === 'new' ? 41 : 17;
+
     const items = rows.map((row, i) => {
       const matchId = matchIdIdx >= 0 ? (row[matchIdIdx] || '').trim() : '';
       const status = statusIdx >= 0 ? (row[statusIdx] || '').trim() : '';
@@ -784,6 +788,12 @@ app.get('/api/userMemo/list', async (req, res) => {
         const allowed = ['', 'ready', '첫수업전재매칭', '일반재매칭', '매칭중', '보류', '확인필요'];
         return allowed.includes(sn);
       }
+    }).filter(item => {
+      if (!managerFilter || managerFilter === '공통') return true;
+      const rowIdx = item.rowNum - 2;
+      const row = rows[rowIdx];
+      const rowManager = row ? (row[managerColIdx] || '').trim().toLowerCase() : '';
+      return rowManager === managerFilter.toLowerCase();
     });
 
     res.json(items);
