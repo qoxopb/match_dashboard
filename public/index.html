@@ -410,11 +410,6 @@
     <span class="section-title">담당자</span>
     <select class="manager-select" id="manager-select" onchange="saveManager(this.value)">
       <option value="공통">공통</option>
-      <option value="jina">jina</option>
-      <option value="harry">harry</option>
-      <option value="hannah">hannah</option>
-      <option value="amanda">amanda</option>
-      <option value="kasey">kasey</option>
     </select>
     <div class="section-line"></div>
   </div>
@@ -630,6 +625,22 @@
           <div style="font-size:13px;color:#999;padding:8px 0;">Google 계정 인�� (추후 구현)</div>
         </div>
 
+        <!-- 담당자 목록 -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">담당자 목록</span>
+          </div>
+          <div style="font-size:13px;color:#666;padding:8px 0;">
+            <div style="margin-bottom:8px;">기능 탭 담당자 드롭다운에 표시될 이름 목록. 모든 기기에 공유됩니다.</div>
+            <div id="manager-list-items" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;"></div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input type="text" id="manager-add-input" placeholder="이름 입력" style="padding:6px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px;width:140px;"
+                onkeydown="if(event.key==='Enter')addManagerItem()" />
+              <button class="btn-run" onclick="addManagerItem()">추가</button>
+            </div>
+          </div>
+        </div>
+
         <!-- 슬랙 태그 대상 -->
         <div class="card">
           <div class="card-header">
@@ -722,16 +733,74 @@
       el.classList.toggle('selected');
     }
 
-    // --- 담당자 (기기별 localStorage) ---
+    // --- 담당자 목록 (서버 저장) + 선택값 (기기별 localStorage) ---
     const MANAGER_JOBS = new Set(['send', 'send:new', 'send:rematch', 'statusCheck', 'statusCheck:new', 'statusCheck:rematch']);
     function getManager() { return localStorage.getItem('matchDashboard_manager') || '공통'; }
-    function saveManager(val) {
-      localStorage.setItem('matchDashboard_manager', val);
-    }
-    function initManagerSelect() {
+    function saveManager(val) { localStorage.setItem('matchDashboard_manager', val); }
+
+    function buildManagerOptions(managers) {
       const sel = document.getElementById('manager-select');
-      if (sel) sel.value = getManager();
+      if (!sel) return;
+      const cur = getManager();
+      sel.innerHTML = '<option value="공통">공통</option>' +
+        managers.map(m => `<option value="${m}">${m}</option>`).join('');
+      sel.value = managers.includes(cur) || cur === '공통' ? cur : '공통';
     }
+
+    async function loadManagerList() {
+      try {
+        const res = await fetch('/api/config/managers');
+        const managers = await res.json();
+        buildManagerOptions(managers);
+        renderManagerItems(managers);
+      } catch {
+        buildManagerOptions(['jina','harry','hannah','amanda','kasey','iris']);
+      }
+    }
+
+    function renderManagerItems(managers) {
+      const el = document.getElementById('manager-list-items');
+      if (!el) return;
+      if (managers.length === 0) {
+        el.innerHTML = '<span style="color:#aaa;font-size:12px;">목록 없음</span>';
+        return;
+      }
+      el.innerHTML = managers.map((m, i) => `
+        <div style="display:inline-flex;align-items:center;gap:4px;background:#f0f4ff;border:1px solid #c5d3f0;border-radius:16px;padding:4px 10px;font-size:13px;">
+          <span>${m}</span>
+          <button onclick="removeManagerItem(${i})" style="background:none;border:none;cursor:pointer;color:#999;padding:0 0 0 2px;font-size:14px;line-height:1;">×</button>
+        </div>`).join('');
+    }
+
+    async function addManagerItem() {
+      const input = document.getElementById('manager-add-input');
+      const name = (input.value || '').trim();
+      if (!name) return;
+      const res = await fetch('/api/config/managers');
+      const managers = await res.json();
+      if (managers.includes(name)) { alert('이미 있는 이름입니다'); return; }
+      managers.push(name);
+      await saveManagerList(managers);
+      input.value = '';
+    }
+
+    async function removeManagerItem(idx) {
+      const res = await fetch('/api/config/managers');
+      const managers = await res.json();
+      managers.splice(idx, 1);
+      await saveManagerList(managers);
+    }
+
+    async function saveManagerList(managers) {
+      await fetch('/api/config/managers', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ managers }),
+      });
+      buildManagerOptions(managers);
+      renderManagerItems(managers);
+    }
+
+    function initManagerSelect() { /* 목록 로드 후 buildManagerOptions에서 처리 */ }
 
     // --- API 호출 ---
     async function runNow(jobId) {
@@ -1947,7 +2016,7 @@
 
     // 초기화
     initScheduleSections();
-    initManagerSelect();
+    loadManagerList();
     fetchSchedules();
     fetchLogs();
     setInterval(() => { fetchLogs(); fetchSchedules(); }, 3000);

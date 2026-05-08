@@ -691,6 +691,19 @@ app.post('/api/config/set', (req, res) => {
   res.json({ ok: true, path: keyPath, value });
 });
 
+// 담당자 목록 API
+const DEFAULT_MANAGERS = ['jina', 'harry', 'hannah', 'amanda', 'kasey', 'iris'];
+app.get('/api/config/managers', (req, res) => {
+  res.json(config.managerList || DEFAULT_MANAGERS);
+});
+app.post('/api/config/managers', (req, res) => {
+  const { managers } = req.body;
+  if (!Array.isArray(managers)) return res.status(400).json({ error: 'managers 배열 필요' });
+  config.managerList = managers;
+  saveConfig();
+  res.json({ ok: true, managers });
+});
+
 // 슬랙 태그 대상 API — [{id, name}]
 app.get('/api/config/slack-tags', (req, res) => {
   res.json(config.slack && config.slack.tagTargets || []);
