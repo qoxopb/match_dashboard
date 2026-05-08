@@ -331,7 +331,6 @@
       <ul class="sidebar-menu">
         <li class="active" data-view="features" onclick="switchView('features')">기능</li>
         <li data-view="workflow" onclick="switchView('workflow')">워크플로</li>
-        <li data-view="logs" onclick="switchView('logs');initLogView()">로그</li>
         <li data-view="status" onclick="switchView('status')">당일 현황</li>
         <li data-view="dashboard" onclick="switchView('dashboard')">대시보드</li>
         <li data-view="settings" onclick="switchView('settings')">설정</li>
@@ -565,25 +564,6 @@
             <button class="btn-small" style="background:#eee;color:#666;" onclick="clearWfLog()">지우기</button>
           </div>
           <div id="wf-log-box" style="background:#1a1a2e;color:#d4d4d4;font-family:'Consolas','Courier New',monospace;font-size:11.5px;line-height:1.6;padding:16px;border-radius:10px;height:250px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;"></div>
-        </div>
-      </section>
-
-      <!-- 로그 -->
-      <section class="view" id="view-logs">
-        <h1>로그</h1>
-        <div class="card">
-          <div class="card-header" style="flex-wrap:wrap;gap:8px;">
-            <span class="card-title">파일 로그</span>
-            <div style="display:flex;gap:8px;align-items:center;margin-left:auto;flex-wrap:wrap;">
-              <input type="date" id="log-date-picker" style="padding:4px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px;" />
-              <button class="btn-run" style="padding:4px 12px;" onclick="loadFileLogs()">조회</button>
-              <label style="font-size:12px;color:#666;display:flex;align-items:center;gap:4px;cursor:pointer;">
-                <input type="checkbox" id="log-auto-refresh" onchange="toggleLogAutoRefresh()"> 자동 갱신 (10s)
-              </label>
-            </div>
-          </div>
-          <div id="log-file-meta" style="font-size:12px;color:#999;margin-bottom:8px;"></div>
-          <div id="log-file-content" style="font-family:monospace;font-size:12px;line-height:1.6;max-height:70vh;overflow-y:auto;white-space:pre-wrap;word-break:break-all;background:#1e1e2e;color:#cdd6f4;border-radius:8px;padding:12px;"></div>
         </div>
       </section>
 
@@ -2064,55 +2044,6 @@
       await renderAimKeywords();
     }
 
-    // --- 로그 뷰어 ---
-    let _logAutoRefreshTimer = null;
-    let _logViewInited = false;
-
-    function initLogView() {
-      if (_logViewInited) return;
-      _logViewInited = true;
-      const picker = document.getElementById('log-date-picker');
-      const now = new Date();
-      const yy = String(now.getFullYear()).slice(2);
-      const mm = String(now.getMonth() + 1).padStart(2, '0');
-      const dd = String(now.getDate()).padStart(2, '0');
-      picker.value = `20${yy}-${mm}-${dd}`;
-      loadFileLogs();
-    }
-
-    async function loadFileLogs() {
-      const picker = document.getElementById('log-date-picker');
-      const val = picker.value; // YYYY-MM-DD
-      const dateStr = val ? val.replace(/-/g, '').slice(2) : ''; // YYMMDD
-      const meta = document.getElementById('log-file-meta');
-      const content = document.getElementById('log-file-content');
-      meta.textContent = '불러오는 중...';
-      try {
-        const res = await fetch('/api/logs/file?date=' + dateStr);
-        const data = await res.json();
-        if (data.error) { meta.textContent = '오류: ' + data.error; content.innerHTML = ''; return; }
-        meta.textContent = `${dateStr || '오늘'} · 총 ${data.total || 0}줄`;
-        const lines = (data.lines || []).slice().reverse();
-        content.innerHTML = lines.map(line => {
-          const escaped = line.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-          if (/\[ERROR\]|에러:|에러 ===|ECONNREFUSED|Error:/i.test(line))
-            return `<span style="color:#f38ba8">${escaped}</span>`;
-          if (/=== .* 시작 ===|=== .* 완료 ===/.test(line))
-            return `<span style="color:#a6e3a1;font-weight:bold">${escaped}</span>`;
-          if (/=== .* 중단/.test(line))
-            return `<span style="color:#fab387">${escaped}</span>`;
-          return escaped;
-        }).join('\n');
-      } catch (e) {
-        meta.textContent = '불러오기 실패: ' + e.message;
-      }
-    }
-
-    function toggleLogAutoRefresh() {
-      const checked = document.getElementById('log-auto-refresh').checked;
-      if (_logAutoRefreshTimer) { clearInterval(_logAutoRefreshTimer); _logAutoRefreshTimer = null; }
-      if (checked) _logAutoRefreshTimer = setInterval(loadFileLogs, 10000);
-    }
   </script>
 </body>
 </html>
