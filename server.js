@@ -703,23 +703,25 @@ async function applyManagerValidation(managers) {
   } : null;
 
   async function applyToSpreadsheet(spreadsheetId, colIdx) {
-    const meta = await sheets.spreadsheets.get({ spreadsheetId, fields: 'sheets(properties(sheetId))' });
-    const requests = (meta.data.sheets || []).map(s => ({
+    const meta = await sheets.spreadsheets.get({ spreadsheetId, fields: 'sheets(properties(sheetId,gridProperties))' });
+    const eligible = (meta.data.sheets || []).filter(s => (s.properties.gridProperties || {}).columnCount > colIdx);
+    const requests = eligible.map(s => ({
       setDataValidation: {
         range: { sheetId: s.properties.sheetId, startRowIndex: 1, startColumnIndex: colIdx, endColumnIndex: colIdx + 1 },
         rule: validationRule,
       },
     }));
     if (requests.length) await sheets.spreadsheets.batchUpdate({ spreadsheetId, requestBody: { requests } });
+    return { total: (meta.data.sheets || []).length, applied: requests.length };
   }
 
   const results = [];
   if (config.sheets && config.sheets.new) {
-    try { await applyToSpreadsheet(config.sheets.new, 41); results.push('신규 AP열 적용'); }
+    try { const r = await applyToSpreadsheet(config.sheets.new, 41); results.push(`신규 AP열 적용 (${r.applied}/${r.total}탭)`); }
     catch (e) { results.push(`신규 시트 실패: ${e.message}`); }
   }
   if (config.sheets && config.sheets.rematch) {
-    try { await applyToSpreadsheet(config.sheets.rematch, 17); results.push('재매칭 R열 적용'); }
+    try { const r = await applyToSpreadsheet(config.sheets.rematch, 17); results.push(`재매칭 R열 적용 (${r.applied}/${r.total}탭)`); }
     catch (e) { results.push(`재매칭 시트 실패: ${e.message}`); }
   }
   return results;
