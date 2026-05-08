@@ -3,7 +3,7 @@ const { getSheetsApi } = require('../sheets');
 const config = require('../config.json');
 const { shouldAbort, setActivePage } = require('../abort');
 
-const ADMIN_BASE = ADMIN_BASE || 'https://tutor-admin.qanda.ai';
+const ADMIN_BASE = config.adminUrl || 'https://tutor-admin.qanda.ai';
 const ADMIN_URL = ADMIN_BASE + '/admin/tutor-pairing';
 
 function getMonthlyTabName(type) {

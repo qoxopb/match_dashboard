@@ -2,7 +2,7 @@ const { newBackgroundPage } = require('./browser');
 const axios = require('axios');
 const config = require('../config.json');
 
-const ADMIN_BASE = ADMIN_BASE || 'https://tutor-admin.qanda.ai';
+const ADMIN_BASE = config.adminUrl || 'https://tutor-admin.qanda.ai';
 const ADMIN_URL = ADMIN_BASE + '/admin/tutor-pairing';
 
 let slackChannelName = null;
