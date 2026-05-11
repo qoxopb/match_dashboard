@@ -385,17 +385,10 @@ app.get('/api/userMemo/debug', async (req, res) => {
       statusCounts[key] = (statusCounts[key] || 0) + 1;
     });
 
-    const managerColIdx = type === 'new' ? 41 : 17;
-    const managerValues = rows
-      .filter(row => matchIdIdx >= 0 && (row[matchIdIdx] || '').trim())
-      .map(row => row[managerColIdx] || '(없음)')
-      .reduce((acc, v) => { acc[v] = (acc[v] || 0) + 1; return acc; }, {});
     res.json({
       type, tabName,
       headerCols: { matchId: matchIdCol, status: statusCol },
       headerIdx: { matchId: matchIdIdx, status: statusIdx },
-      managerCol: `idx ${managerColIdx} = "${header[managerColIdx]}"`,
-      managerValues,
       totalRows: rows.length,
       totalWithMatchId,
       statusCounts,

@@ -589,7 +589,8 @@
       if (autoNext && type === 'new') {
         const filterParam = params.get('filter') || 'all';
         const wfParam = fromWorkflow ? '&fromWorkflow=true' : '';
-        window.location.href = `/userMemo.html?type=rematch&filter=${filterParam}&autoNext=true${wfParam}`;
+        const managerParam = params.get('manager') ? `&manager=${encodeURIComponent(params.get('manager'))}` : '';
+        window.location.href = `/userMemo.html?type=rematch&filter=${filterParam}&autoNext=true${wfParam}${managerParam}`;
         return;
       }
 
