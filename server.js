@@ -385,11 +385,14 @@ app.get('/api/userMemo/debug', async (req, res) => {
       statusCounts[key] = (statusCounts[key] || 0) + 1;
     });
 
+    const managerColIdx = type === 'new' ? 41 : 17;
+    const managerSamples = rows.slice(0, 30).map(row => JSON.stringify(row[managerColIdx])).filter((v,i,a)=>a.indexOf(v)===i);
     res.json({
       type, tabName,
       headerCols: { matchId: matchIdCol, status: statusCol },
       headerIdx: { matchId: matchIdIdx, status: statusIdx },
-      header: header.map((h, i) => `${i}:${h}`),
+      managerCol: `idx ${managerColIdx} = "${header[managerColIdx]}"`,
+      managerSamples,
       totalRows: rows.length,
       totalWithMatchId,
       statusCounts,
