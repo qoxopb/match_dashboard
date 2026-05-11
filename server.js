@@ -386,13 +386,16 @@ app.get('/api/userMemo/debug', async (req, res) => {
     });
 
     const managerColIdx = type === 'new' ? 41 : 17;
-    const managerSamples = rows.slice(0, 30).map(row => JSON.stringify(row[managerColIdx])).filter((v,i,a)=>a.indexOf(v)===i);
+    const managerValues = rows
+      .filter(row => matchIdIdx >= 0 && (row[matchIdIdx] || '').trim())
+      .map(row => row[managerColIdx] || '(없음)')
+      .reduce((acc, v) => { acc[v] = (acc[v] || 0) + 1; return acc; }, {});
     res.json({
       type, tabName,
       headerCols: { matchId: matchIdCol, status: statusCol },
       headerIdx: { matchId: matchIdIdx, status: statusIdx },
       managerCol: `idx ${managerColIdx} = "${header[managerColIdx]}"`,
-      managerSamples,
+      managerValues,
       totalRows: rows.length,
       totalWithMatchId,
       statusCounts,
