@@ -389,6 +389,7 @@ app.get('/api/userMemo/debug', async (req, res) => {
       type, tabName,
       headerCols: { matchId: matchIdCol, status: statusCol },
       headerIdx: { matchId: matchIdIdx, status: statusIdx },
+      header: header.map((h, i) => `${i}:${h}`),
       totalRows: rows.length,
       totalWithMatchId,
       statusCounts,
