@@ -28,8 +28,9 @@ function buildFilterUrl(matchId) {
   return `${ADMIN_URL}?page=1&size=20&filters_matchId=${encodeURIComponent(matchId)}`;
 }
 
-async function runPairing() {
-  console.log('\n[pairing] === 신규 페어링 생성 시작 ===');
+async function runPairing(manager) {
+  const managerLabel = manager && manager !== '공통' ? ` (담당자: ${manager})` : '';
+  console.log(`\n[pairing] === 신규 페어링 생성 시작${managerLabel} ===`);
   const startedAt = Date.now();
 
   const sheets = await getSheetsApi();
@@ -57,15 +58,14 @@ async function runPairing() {
   const rows = dataRes.data.values || [];
 
   // 2) 대상 필터: match_id 있고 매칭상태가 빈 값
+  const filterByManager = manager && manager !== '공통';
   const targets = [];
   rows.forEach((row, i) => {
     const matchId = (row[matchIdIdx] || '').trim();
     const status = (row[statusIdx] || '').trim();
     if (matchId && status === '') {
-      targets.push({
-        matchId,
-        rowNum: i + 2,
-      });
+      if (filterByManager && (row[41] || '').trim().toLowerCase() !== manager.toLowerCase()) return;
+      targets.push({ matchId, rowNum: i + 2 });
     }
   });
   console.log(`[pairing] 대상 ${targets.length}건 / ${WORKER_COUNT} 워커 병렬 처리`);

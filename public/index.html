@@ -394,6 +394,15 @@
     </div>
   </div>
 
+  <!-- 담당자 섹션 -->
+  <div class="section-header">
+    <span class="section-title">담당자</span>
+    <select class="manager-select" id="manager-select" onchange="saveManager(this.value)">
+      <option value="공통">공통</option>
+    </select>
+    <div class="section-line"></div>
+  </div>
+
   <!-- 페어링 생성 -->
   <div class="card" id="card-pairing">
     <div class="card-header">
@@ -403,15 +412,6 @@
       <label>즉시 실행</label>
       <button class="btn-run" data-run-job="pairing" onclick="runNow('pairing')">페어링 생성</button>
     </div>
-  </div>
-
-  <!-- 담당자 섹션 -->
-  <div class="section-header">
-    <span class="section-title">담당자</span>
-    <select class="manager-select" id="manager-select" onchange="saveManager(this.value)">
-      <option value="공통">공통</option>
-    </select>
-    <div class="section-line"></div>
   </div>
 
   <!-- 유저메모 편집 -->
@@ -735,7 +735,7 @@
     }
 
     // --- 담당자 목록 (서버 저장) + 선택값 (기기별 localStorage) ---
-    const MANAGER_JOBS = new Set(['send', 'send:new', 'send:rematch', 'statusCheck', 'statusCheck:new', 'statusCheck:rematch']);
+    const MANAGER_JOBS = new Set(['pairing', 'send', 'send:new', 'send:rematch', 'statusCheck', 'statusCheck:new', 'statusCheck:rematch']);
     function getManager() { return localStorage.getItem('matchDashboard_manager') || '공통'; }
     function saveManager(val) { localStorage.setItem('matchDashboard_manager', val); }
 
