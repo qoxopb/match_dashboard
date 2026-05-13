@@ -87,10 +87,20 @@ function normalizeJobId(jobId) {
 const runningJobs = new Set(); // 실행 중인 jobId들
 const taskQueue = []; // { jobId, resolve }
 
-function getRunLockId(jobId) {
-  // 같은 버튼을 다시 누른 경우만 큐에 넣고, 다른 버튼은 동시에 실행되도록 개별 jobId 기준으로 잠근다.
+function getRunLockId(jobId, manager) {
+  // wf는 단일 잠금, 담당자가 지정된 경우 jobId:manager 조합으로 잠금 → 다른 담당자는 동시 실행 가능
   if (jobId.startsWith('wf:')) return 'wf';
+  if (manager && manager !== '공통') return `${jobId}:${manager}`;
   return jobId;
+}
+
+function getLockDisplayName(lockId) {
+  const ci = lockId.indexOf(':');
+  if (ci < 0) { const j = JOBS[lockId]; return j ? j.name : lockId; }
+  const jid = lockId.substring(0, ci);
+  const mgr = lockId.substring(ci + 1);
+  const j = JOBS[jid];
+  return `${j ? j.name : jid} (${mgr})`;
 }
 
 async function runTask(jobId, opts = {}) {
@@ -98,7 +108,7 @@ async function runTask(jobId, opts = {}) {
   const job = JOBS[jobId];
   if (!job) return { ok: false, message: `알 수 없는 작업: ${jobId}` };
 
-  const lockId = getRunLockId(jobId);
+  const lockId = getRunLockId(jobId, opts.manager);
 
   // 같은 버튼이 이미 실행 중이면 큐에 넣고 대기
   if (runningJobs.has(lockId)) {
@@ -107,7 +117,7 @@ async function runTask(jobId, opts = {}) {
   }
 
   runningJobs.add(lockId);
-  running = [...runningJobs].length > 0 ? [...runningJobs].map(id => { const j = JOBS[id]; return j ? j.name : id; }).join(', ') : null;
+  running = [...runningJobs].length > 0 ? [...runningJobs].map(getLockDisplayName).join(', ') : null;
   return await logContext.run({ jobId, lockId, name: job.name }, async () => {
     resetAbort();
     addLog(`=== ${job.name} 시작${opts.manager && opts.manager !== '공통' ? ` (담당자: ${opts.manager})` : ''} ===`);
@@ -131,7 +141,7 @@ async function runTask(jobId, opts = {}) {
       return { ok: false, message: err.message };
     } finally {
       runningJobs.delete(lockId);
-      running = runningJobs.size > 0 ? [...runningJobs].map(id => { const j = JOBS[id]; return j ? j.name : id; }).join(', ') : null;
+      running = runningJobs.size > 0 ? [...runningJobs].map(getLockDisplayName).join(', ') : null;
       // 큐에서 같은 버튼 대기 중인 작업 하나 깨우기
       const idx = taskQueue.findIndex(t => t.lockId === lockId);
       if (idx >= 0) taskQueue.splice(idx, 1)[0].resolve();

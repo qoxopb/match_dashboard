@@ -737,7 +737,7 @@
     // --- 담당자 목록 (서버 저장) + 선택값 (기기별 localStorage) ---
     const MANAGER_JOBS = new Set(['pairing', 'send', 'send:new', 'send:rematch', 'statusCheck', 'statusCheck:new', 'statusCheck:rematch']);
     function getManager() { return localStorage.getItem('matchDashboard_manager') || '공통'; }
-    function saveManager(val) { localStorage.setItem('matchDashboard_manager', val); }
+    function saveManager(val) { localStorage.setItem('matchDashboard_manager', val); updateRunButtons(activeRunJobs); }
 
     function buildManagerOptions(managers) {
       const sel = document.getElementById('manager-select');
@@ -812,10 +812,11 @@
 
     // --- API 호출 ---
     async function runNow(jobId) {
-      setRunning(jobId, [...new Set([...activeRunJobs, runLockId(jobId)])]);
+      const manager = MANAGER_JOBS.has(jobId) ? getManager() : null;
+      setRunning(jobId, [...new Set([...activeRunJobs, runLockId(jobId, manager)])]);
       try {
         const body = {};
-        if (MANAGER_JOBS.has(jobId)) body.manager = getManager();
+        if (manager) body.manager = manager;
         const res = await fetch(`/api/run/${jobId}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -917,16 +918,18 @@
     const logBox = document.getElementById('log-box');
     let activeRunJobs = [];
 
-    function runLockId(jobId) {
+    function runLockId(jobId, manager) {
       if (!jobId) return '';
       if (jobId.startsWith('wf:')) return 'wf';
+      if (MANAGER_JOBS.has(jobId) && manager && manager !== '공통') return `${jobId}:${manager}`;
       return jobId;
     }
 
     function updateRunButtons(runningJobs = []) {
-      const runningLocks = new Set(runningJobs.map(runLockId));
+      const runningLocks = new Set(runningJobs);
+      const currentManager = getManager();
       document.querySelectorAll('#view-features [data-run-job]').forEach(button => {
-        button.disabled = runningLocks.has(runLockId(button.dataset.runJob));
+        button.disabled = runningLocks.has(runLockId(button.dataset.runJob, currentManager));
       });
     }
 
