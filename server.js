@@ -40,9 +40,8 @@ function getLogFileName() {
 function formatLogMessage(msg) {
   const ctx = logContext.getStore();
   if (!ctx) return msg;
-  const prefix = ctx.manager && ctx.manager !== '공통'
-    ? `[${ctx.name}:${ctx.manager}]`
-    : `[${ctx.name}]`;
+  const managerTag = ctx.manager && ctx.manager !== '공통' ? `·${ctx.manager}` : '';
+  const prefix = `[${ctx.name}${managerTag}]`;
   return msg.startsWith(prefix) ? msg : `${prefix} ${msg}`;
 }
 
