@@ -40,7 +40,9 @@ function getLogFileName() {
 function formatLogMessage(msg) {
   const ctx = logContext.getStore();
   if (!ctx) return msg;
-  const prefix = `[${ctx.name}]`;
+  const prefix = ctx.manager && ctx.manager !== '공통'
+    ? `[${ctx.name}:${ctx.manager}]`
+    : `[${ctx.name}]`;
   return msg.startsWith(prefix) ? msg : `${prefix} ${msg}`;
 }
 
@@ -118,7 +120,7 @@ async function runTask(jobId, opts = {}) {
 
   runningJobs.add(lockId);
   running = [...runningJobs].length > 0 ? [...runningJobs].map(getLockDisplayName).join(', ') : null;
-  return await logContext.run({ jobId, lockId, name: job.name }, async () => {
+  return await logContext.run({ jobId, lockId, name: job.name, manager: opts.manager }, async () => {
     resetAbort();
     addLog(`=== ${job.name} 시작${opts.manager && opts.manager !== '공통' ? ` (담당자: ${opts.manager})` : ''} ===`);
     try {
