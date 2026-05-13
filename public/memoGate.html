@@ -86,9 +86,10 @@
       if (acceptData.ok) {
         // 성공 → 유저메모 편집 페이지로 이동
         const filterParam = memoFilter === 'initial' ? '&filter=initial' : '';
+        const managerParam = name ? `&manager=${encodeURIComponent(name)}` : '';
         const url = memoType === 'all'
-          ? `/userMemo.html?type=new${filterParam}&autoNext=true&fromWorkflow=true`
-          : `/userMemo.html?type=${memoType}${filterParam}&fromWorkflow=true`;
+          ? `/userMemo.html?type=new${filterParam}&autoNext=true&fromWorkflow=true${managerParam}`
+          : `/userMemo.html?type=${memoType}${filterParam}&fromWorkflow=true${managerParam}`;
         location.href = url;
       } else {
         // 이미 다른 사람이 편집 중

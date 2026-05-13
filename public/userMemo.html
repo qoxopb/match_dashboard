@@ -163,6 +163,7 @@
   <div class="top-bar">
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;" id="top-info">
       <span class="type-badge" id="type-badge"></span>
+      <span id="manager-badge" style="display:none;font-size:12px;padding:3px 10px;border-radius:12px;background:#e8f5e9;color:#2e7d32;font-weight:500;"></span>
       <span id="info-line" style="font-size:14px;font-weight:500;"></span>
     </div>
     <div class="nav">
@@ -289,6 +290,14 @@
       badge.textContent = type === 'new' ? '신규매칭' : '재매칭';
       badge.className = 'type-badge ' + (type === 'new' ? 'type-new' : 'type-rematch');
 
+      // 담당자 표시
+      const managerParam = params.get('manager') || '';
+      const managerBadge = document.getElementById('manager-badge');
+      if (managerParam && managerParam !== '공통') {
+        managerBadge.textContent = '담당자: ' + managerParam;
+        managerBadge.style.display = '';
+      }
+
       try {
         const statusRes = await fetch('/api/status');
         const statusData = await statusRes.json();
@@ -302,11 +311,13 @@
 
         // 2단계: 목록 조회
         document.querySelector('#loading-screen span').textContent = '목록 불러오는 중...';
-        const filterParam = new URLSearchParams(window.location.search).get('filter') || 'all';
-        const managerParam = new URLSearchParams(window.location.search).get('manager') || '';
+        const filterParam = params.get('filter') || 'all';
         const managerQs = managerParam ? `&manager=${encodeURIComponent(managerParam)}` : '';
-        const res = await fetch(`/api/userMemo/list?type=${type}&filter=${filterParam}${managerQs}`);
+        const listUrl = `/api/userMemo/list?type=${type}&filter=${filterParam}${managerQs}`;
+        console.log('[userMemo] list URL:', listUrl);
+        const res = await fetch(listUrl);
         items = await res.json();
+        console.log('[userMemo] items:', items.length, '건');
       } catch { items = []; }
 
       if (items.length === 0) {

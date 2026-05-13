@@ -1692,9 +1692,11 @@
 
     function openMemoPopup(memoType, memoFilter) {
       const filterParam = memoFilter === 'initial' ? '&filter=initial' : '';
+      const manager = getManager();
+      const managerParam = manager && manager !== '공통' ? `&manager=${encodeURIComponent(manager)}` : '';
       const url = memoType === 'all'
-        ? `/userMemo.html?type=new${filterParam}&autoNext=true`
-        : `/userMemo.html?type=${memoType}${filterParam}`;
+        ? `/userMemo.html?type=new${filterParam}&autoNext=true${managerParam}`
+        : `/userMemo.html?type=${memoType}${filterParam}${managerParam}`;
       return window.open(url, '_blank', `width=${screen.availWidth},height=${screen.availHeight},left=0,top=0`);
     }
 
@@ -2030,14 +2032,6 @@
     setInterval(() => { fetchLogs(); fetchSchedules(); }, 3000);
 
     // --- 워크플로 대기 작업 알림 (서버 스케줄 실행 시) ---
-    // 유저메모 팝업을 위한 함수 (수동 실행 시 사용)
-    function openMemoPopup(memoType, memoFilter) {
-      const filterParam = memoFilter === 'initial' ? '&filter=initial' : '';
-      const url = memoType === 'all'
-        ? `/userMemo.html?type=new${filterParam}&autoNext=true`
-        : `/userMemo.html?type=${memoType}${filterParam}`;
-      return window.open(url, '_blank', `width=${screen.availWidth},height=${screen.availHeight},left=0,top=0`);
-    }
 
     // --- 설정: 슬랙 태그 대상 ---
     async function loadSlackTags() {
