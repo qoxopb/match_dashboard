@@ -6,7 +6,14 @@ let context = null;
 async function connect() {
   if (browser && browser.isConnected()) return context;
 
-  browser = await chromium.connectOverCDP('http://127.0.0.1:9333');
+  try {
+    browser = await chromium.connectOverCDP('http://127.0.0.1:9333');
+  } catch (e) {
+    if (e.message.includes('ECONNREFUSED')) {
+      throw new Error('Chrome CDP 연결 실패 (포트 9333). 크롬을 --remote-debugging-port=9333 옵션으로 실행해주세요.\n명령어: chrome.exe --remote-debugging-port=9333');
+    }
+    throw e;
+  }
   context = browser.contexts()[0];
 
   if (!context) {
